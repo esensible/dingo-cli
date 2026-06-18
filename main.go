@@ -13,6 +13,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"time"
 
 	"dingo-cli/internal/dingo"
 	"dingo-cli/internal/slcan"
@@ -31,6 +32,7 @@ func main() {
 	bitrate := fs.Int("bitrate", 500000, "CAN bitrate")
 	outFile := fs.String("o", "", "output file for dump (default stdout)")
 	burn := fs.Bool("burn", false, "burn to flash after a successful write")
+	secs := fs.Int("secs", 6, "listen duration in seconds")
 	_ = fs.Parse(os.Args[2:])
 
 	switch cmd {
@@ -64,16 +66,46 @@ func main() {
 		check(err)
 		fmt.Printf("device config CRC = %08X\n", crc)
 
+	case "version":
+		cl := connect(*port, uint16(*base), *bitrate)
+		defer cl.Close()
+		maj, min, bld, err := cl.Version()
+		check(err)
+		fmt.Printf("firmware v%d.%d.%d\n", maj, min, bld)
+
 	case "burn":
 		cl := connect(*port, uint16(*base), *bitrate)
 		defer cl.Close()
 		check(cl.Burn())
-		fmt.Println("burned to flash")
+		fmt.Println("burned to flash (verified)")
 
 	case "bootloader":
 		cl := connect(*port, uint16(*base), *bitrate)
 		check(cl.Bootloader())
 		fmt.Println("bootloader requested — device resetting to DFU")
+
+	case "listen":
+		if *port == "" {
+			fatal("missing -port")
+		}
+		p, err := slcan.Open(*port, *bitrate)
+		check(err)
+		defer p.Close()
+		cl := dingo.New(p, uint16(*base))
+		_ = cl.SendReadAll()
+		deadline := time.Now().Add(time.Duration(*secs) * time.Second)
+		n := 0
+		for time.Now().Before(deadline) {
+			f, err := p.Recv(500 * time.Millisecond)
+			if err != nil {
+				continue
+			}
+			n++
+			if n <= 50 {
+				fmt.Printf("id=%03X data=%X\n", f.ID, f.Data)
+			}
+		}
+		fmt.Printf("received %d frames\n", n)
 
 	default:
 		usage()

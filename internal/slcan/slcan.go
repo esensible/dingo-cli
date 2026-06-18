@@ -5,6 +5,10 @@
 //   - open sequence: "C\r", "S<code>\r", "O\r"  (S6 = 500 kbit/s)
 //   - frame:          "t" + 3 hex ID + 1 hex DLC + DLC*2 hex data + "\r"
 //   - 115200 8N1, no handshake
+//
+// A dedicated goroutine reads the port continuously into a large buffered
+// channel so high-rate bursts (e.g. a full ReadAll dump) are never dropped by
+// the OS tty buffer.
 package slcan
 
 import (
@@ -26,7 +30,9 @@ type Frame struct {
 
 // Port is an open SLCAN connection.
 type Port struct {
-	p serial.Port
+	p      serial.Port
+	frames chan Frame
+	done   chan struct{}
 }
 
 // standard SLCAN S-command bitrate codes
@@ -34,7 +40,8 @@ var bitrateCode = map[int]string{
 	100000: "3", 125000: "4", 250000: "5", 500000: "6", 1000000: "8",
 }
 
-// Open opens the serial port and brings up the SLCAN channel.
+// Open opens the serial port, brings up the SLCAN channel, starts the reader,
+// and lets the device settle (early commands are otherwise dropped).
 func Open(name string, bitrate int) (*Port, error) {
 	p, err := serial.Open(name, &serial.Mode{
 		BaudRate: 115200,
@@ -45,9 +52,15 @@ func Open(name string, bitrate int) (*Port, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := p.SetReadTimeout(100 * time.Millisecond); err != nil {
+	if err := p.SetReadTimeout(50 * time.Millisecond); err != nil {
 		p.Close()
 		return nil, err
+	}
+
+	port := &Port{
+		p:      p,
+		frames: make(chan Frame, 16384),
+		done:   make(chan struct{}),
 	}
 
 	code, ok := bitrateCode[bitrate]
@@ -60,11 +73,15 @@ func Open(name string, bitrate int) (*Port, error) {
 			return nil, err
 		}
 	}
-	return &Port{p: p}, nil
+
+	go port.readLoop()
+	port.Drain(1500 * time.Millisecond) // settle + discard startup chatter
+	return port, nil
 }
 
-// Close closes the SLCAN channel and the serial port.
+// Close stops the reader, closes the SLCAN channel and the serial port.
 func (port *Port) Close() error {
+	close(port.done)
 	_, _ = port.p.Write([]byte("C\r"))
 	return port.p.Close()
 }
@@ -83,38 +100,62 @@ func (port *Port) Send(f Frame) error {
 	return err
 }
 
-// Recv reads the next "t" frame, or returns ErrTimeout once the deadline passes.
+// Recv returns the next frame, or ErrTimeout once the timeout elapses.
 func (port *Port) Recv(timeout time.Duration) (Frame, error) {
-	deadline := time.Now().Add(timeout)
-	for {
-		line, err := port.readLine(deadline)
-		if err != nil {
-			return Frame{}, err
-		}
-		f, ok := parseFrame(line)
-		if ok {
-			return f, nil
-		}
-		// non-frame line (status/ack) — keep reading until deadline
+	select {
+	case f := <-port.frames:
+		return f, nil
+	case <-time.After(timeout):
+		return Frame{}, ErrTimeout
 	}
 }
 
-func (port *Port) readLine(deadline time.Time) ([]byte, error) {
-	var buf []byte
-	tmp := make([]byte, 64)
+// Drain discards all buffered/incoming frames for d.
+func (port *Port) Drain(d time.Duration) {
+	deadline := time.After(d)
 	for {
+		select {
+		case <-port.frames:
+		case <-deadline:
+			return
+		}
+	}
+}
+
+func (port *Port) readLoop() {
+	tmp := make([]byte, 4096)
+	var line []byte
+	for {
+		select {
+		case <-port.done:
+			return
+		default:
+		}
 		n, err := port.p.Read(tmp)
 		if err != nil {
-			return nil, err
+			select {
+			case <-port.done:
+				return
+			default:
+				continue
+			}
 		}
 		for i := 0; i < n; i++ {
-			if tmp[i] == '\r' {
-				return buf, nil
+			b := tmp[i]
+			if b == '\r' {
+				if f, ok := parseFrame(line); ok {
+					// Blocking send: never drop. If we fall behind, back-pressure
+					// reaches the device via USB flow control (it blocks on TX-full).
+					select {
+					case port.frames <- f:
+					case <-port.done:
+						return
+					}
+				}
+				line = line[:0]
+			} else {
+				line = append(line, b)
 			}
-			buf = append(buf, tmp[i])
-		}
-		if n == 0 && time.Now().After(deadline) {
-			return nil, ErrTimeout
 		}
 	}
 }
