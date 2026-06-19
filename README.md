@@ -12,10 +12,11 @@ SLCAN. Commands go to `BaseId+1`, responses come back on `BaseId+0`.
 
 ```
 # Name-based (recommended) — every UI-exposed feature, by name
-dingo apply  -port <p> [-base 222] [-burn] config.json   # declarative config (see below)
-dingo set    -port <p> [-base 222] [-burn] <name> <value> # write one parameter by name
-dingo getn   -port <p> [-base 222] -name <name>           # read one parameter by name
-dingo dump   -port <p> [-base 222] -named [-o config.json] # read all as a name->value object
+dingo apply    -port <p> [-base 222] [-burn] config.json   # declarative config (see below)
+dingo set      -port <p> [-base 222] [-burn] <name> <value> # write one parameter by name
+dingo getn     -port <p> [-base 222] -name <name>          # read one parameter by name
+dingo dump     -port <p> [-base 222] -named [-o config.json] # read all as a name->value object
+dingo defaults [-o config.json]                            # emit the full registry as a default config
 
 # Raw index/subindex (low level)
 dingo write  -port <p> [-base 222] [-burn] config.json   # write raw params + verify (count+CRC)
@@ -27,9 +28,13 @@ dingo version | verify | burn | bootloader -port <p> [-base 222]
 
 # Bus tools
 dingo listen -port <p> -secs <n>                         # passive bus monitor
-dingo tx     -port <p> -id <id> -data <hex> [-watch <id>] # send one frame
+dingo tx     -port <p> -id <id> -data <hex> [-watch <id>] # send one frame (exact DLC)
 dingo pulse  -port <p> -id <id> -data <hex> -ms <on> -gap <off> -repeat <n|0=forever>
+dingo raw    -port <p> -data <hex>                       # write raw CDC bytes, no SLCAN framing
 ```
+
+Each subcommand owns its own flags; run `dingo <command> -h` for the exact set.
+An unknown or misplaced flag is rejected (not silently ignored).
 
 ## Declarative config (`apply`)
 
