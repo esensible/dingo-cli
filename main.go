@@ -335,13 +335,19 @@ func runBootloader(args []string) error {
 	fs := flag.NewFlagSet("bootloader", flag.ExitOnError)
 	c := addConn(fs)
 	fs.Parse(args)
-	return c.client(func(cl *dingo.Client) error {
-		if err := cl.Bootloader(); err != nil {
-			return err
-		}
-		fmt.Println("bootloader requested — device resetting to DFU")
-		return nil
-	})
+	p, err := c.open()
+	if err != nil {
+		return err
+	}
+	// Intentionally do NOT close the port. The device resets into the DFU
+	// bootloader immediately, so the SLCAN close sequence ("C\r") would be
+	// written to a vanishing port and could error or hang. The process exits
+	// right after this, which releases the fd.
+	if err := dingo.New(p, uint16(*c.base)).Bootloader(); err != nil {
+		return err
+	}
+	fmt.Println("bootloader requested — device resetting to DFU")
+	return nil
 }
 
 func runListen(args []string) error {
