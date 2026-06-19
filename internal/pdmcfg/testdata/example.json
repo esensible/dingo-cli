@@ -1,0 +1,3387 @@
+{
+  "PdmDevices": [
+    {
+      "pdmType": 0,
+      "name": "test1",
+      "baseId": 222,
+      "sleepEnabled": false,
+      "filtersEnabled": false,
+      "connectUsbToCan": true,
+      "bitrate": 1,
+      "inputs": [
+        {
+          "enabled": false,
+          "name": "digitalInput1",
+          "number": 1,
+          "invert": false,
+          "mode": 0,
+          "debounceTime": 20,
+          "pull": 0
+        },
+        {
+          "enabled": false,
+          "name": "digitalInput2",
+          "number": 2,
+          "invert": false,
+          "mode": 0,
+          "debounceTime": 20,
+          "pull": 0
+        }
+      ],
+      "outputs": [
+        {
+          "enabled": true,
+          "name": "output1",
+          "number": 1,
+          "currentLimit": 20,
+          "resetCountLimit": 3,
+          "resetMode": 0,
+          "resetTime": 1000,
+          "inrushCurrentLimit": 50,
+          "inrushTime": 1000,
+          "input": 119,
+          "pwmEnabled": false,
+          "softStartEnabled": false,
+          "variableDutyCycle": false,
+          "dutyCycleInput": 0,
+          "fixedDutyCycle": 100,
+          "frequency": 100,
+          "softStartRampTime": 0,
+          "dutyCycleDenominator": 100,
+          "minDutyCycle": 0,
+          "primaryOutput": -1
+        },
+        {
+          "enabled": false,
+          "name": "output2",
+          "number": 2,
+          "currentLimit": 20,
+          "resetCountLimit": 3,
+          "resetMode": 0,
+          "resetTime": 1000,
+          "inrushCurrentLimit": 50,
+          "inrushTime": 1000,
+          "input": 0,
+          "pwmEnabled": false,
+          "softStartEnabled": false,
+          "variableDutyCycle": false,
+          "dutyCycleInput": 0,
+          "fixedDutyCycle": 100,
+          "frequency": 100,
+          "softStartRampTime": 0,
+          "dutyCycleDenominator": 100,
+          "minDutyCycle": 0,
+          "primaryOutput": -1
+        },
+        {
+          "enabled": false,
+          "name": "output3",
+          "number": 3,
+          "currentLimit": 20,
+          "resetCountLimit": 3,
+          "resetMode": 0,
+          "resetTime": 1000,
+          "inrushCurrentLimit": 50,
+          "inrushTime": 1000,
+          "input": 0,
+          "pwmEnabled": false,
+          "softStartEnabled": false,
+          "variableDutyCycle": false,
+          "dutyCycleInput": 0,
+          "fixedDutyCycle": 100,
+          "frequency": 100,
+          "softStartRampTime": 0,
+          "dutyCycleDenominator": 100,
+          "minDutyCycle": 0,
+          "primaryOutput": -1
+        },
+        {
+          "enabled": false,
+          "name": "output4",
+          "number": 4,
+          "currentLimit": 20,
+          "resetCountLimit": 3,
+          "resetMode": 0,
+          "resetTime": 1000,
+          "inrushCurrentLimit": 50,
+          "inrushTime": 1000,
+          "input": 0,
+          "pwmEnabled": false,
+          "softStartEnabled": false,
+          "variableDutyCycle": false,
+          "dutyCycleInput": 0,
+          "fixedDutyCycle": 100,
+          "frequency": 100,
+          "softStartRampTime": 0,
+          "dutyCycleDenominator": 100,
+          "minDutyCycle": 0,
+          "primaryOutput": -1
+        },
+        {
+          "enabled": false,
+          "name": "output5",
+          "number": 5,
+          "currentLimit": 20,
+          "resetCountLimit": 3,
+          "resetMode": 0,
+          "resetTime": 1000,
+          "inrushCurrentLimit": 50,
+          "inrushTime": 1000,
+          "input": 0,
+          "pwmEnabled": false,
+          "softStartEnabled": false,
+          "variableDutyCycle": false,
+          "dutyCycleInput": 0,
+          "fixedDutyCycle": 100,
+          "frequency": 100,
+          "softStartRampTime": 0,
+          "dutyCycleDenominator": 100,
+          "minDutyCycle": 0,
+          "primaryOutput": -1
+        },
+        {
+          "enabled": false,
+          "name": "output6",
+          "number": 6,
+          "currentLimit": 20,
+          "resetCountLimit": 3,
+          "resetMode": 0,
+          "resetTime": 1000,
+          "inrushCurrentLimit": 50,
+          "inrushTime": 1000,
+          "input": 0,
+          "pwmEnabled": false,
+          "softStartEnabled": false,
+          "variableDutyCycle": false,
+          "dutyCycleInput": 0,
+          "fixedDutyCycle": 100,
+          "frequency": 100,
+          "softStartRampTime": 0,
+          "dutyCycleDenominator": 100,
+          "minDutyCycle": 0,
+          "primaryOutput": -1
+        },
+        {
+          "enabled": false,
+          "name": "output7",
+          "number": 7,
+          "currentLimit": 20,
+          "resetCountLimit": 3,
+          "resetMode": 0,
+          "resetTime": 1000,
+          "inrushCurrentLimit": 50,
+          "inrushTime": 1000,
+          "input": 0,
+          "pwmEnabled": false,
+          "softStartEnabled": false,
+          "variableDutyCycle": false,
+          "dutyCycleInput": 0,
+          "fixedDutyCycle": 100,
+          "frequency": 100,
+          "softStartRampTime": 0,
+          "dutyCycleDenominator": 100,
+          "minDutyCycle": 0,
+          "primaryOutput": -1
+        },
+        {
+          "enabled": false,
+          "name": "output8",
+          "number": 8,
+          "currentLimit": 20,
+          "resetCountLimit": 3,
+          "resetMode": 0,
+          "resetTime": 1000,
+          "inrushCurrentLimit": 50,
+          "inrushTime": 1000,
+          "input": 0,
+          "pwmEnabled": false,
+          "softStartEnabled": false,
+          "variableDutyCycle": false,
+          "dutyCycleInput": 0,
+          "fixedDutyCycle": 100,
+          "frequency": 100,
+          "softStartRampTime": 0,
+          "dutyCycleDenominator": 100,
+          "minDutyCycle": 0,
+          "primaryOutput": -1
+        }
+      ],
+      "canInputs": [
+        {
+          "name": "canInput1",
+          "number": 1,
+          "enabled": false,
+          "timeoutEnabled": false,
+          "timeout": 1000,
+          "ide": false,
+          "startBit": 0,
+          "bitLength": 8,
+          "factor": 1,
+          "offset": 0,
+          "byteOrder": 0,
+          "signed": false,
+          "operator": 0,
+          "operand": 0,
+          "mode": 0,
+          "id": 0
+        },
+        {
+          "name": "canInput2",
+          "number": 2,
+          "enabled": false,
+          "timeoutEnabled": false,
+          "timeout": 1000,
+          "ide": false,
+          "startBit": 0,
+          "bitLength": 8,
+          "factor": 1,
+          "offset": 0,
+          "byteOrder": 0,
+          "signed": false,
+          "operator": 0,
+          "operand": 0,
+          "mode": 0,
+          "id": 0
+        },
+        {
+          "name": "canInput3",
+          "number": 3,
+          "enabled": false,
+          "timeoutEnabled": false,
+          "timeout": 1000,
+          "ide": false,
+          "startBit": 0,
+          "bitLength": 8,
+          "factor": 1,
+          "offset": 0,
+          "byteOrder": 0,
+          "signed": false,
+          "operator": 0,
+          "operand": 0,
+          "mode": 0,
+          "id": 0
+        },
+        {
+          "name": "canInput4",
+          "number": 4,
+          "enabled": false,
+          "timeoutEnabled": false,
+          "timeout": 1000,
+          "ide": false,
+          "startBit": 0,
+          "bitLength": 8,
+          "factor": 1,
+          "offset": 0,
+          "byteOrder": 0,
+          "signed": false,
+          "operator": 0,
+          "operand": 0,
+          "mode": 0,
+          "id": 0
+        },
+        {
+          "name": "canInput5",
+          "number": 5,
+          "enabled": false,
+          "timeoutEnabled": false,
+          "timeout": 1000,
+          "ide": false,
+          "startBit": 0,
+          "bitLength": 8,
+          "factor": 1,
+          "offset": 0,
+          "byteOrder": 0,
+          "signed": false,
+          "operator": 0,
+          "operand": 0,
+          "mode": 0,
+          "id": 0
+        },
+        {
+          "name": "canInput6",
+          "number": 6,
+          "enabled": false,
+          "timeoutEnabled": false,
+          "timeout": 1000,
+          "ide": false,
+          "startBit": 0,
+          "bitLength": 8,
+          "factor": 1,
+          "offset": 0,
+          "byteOrder": 0,
+          "signed": false,
+          "operator": 0,
+          "operand": 0,
+          "mode": 0,
+          "id": 0
+        },
+        {
+          "name": "canInput7",
+          "number": 7,
+          "enabled": false,
+          "timeoutEnabled": false,
+          "timeout": 1000,
+          "ide": false,
+          "startBit": 0,
+          "bitLength": 8,
+          "factor": 1,
+          "offset": 0,
+          "byteOrder": 0,
+          "signed": false,
+          "operator": 0,
+          "operand": 0,
+          "mode": 0,
+          "id": 0
+        },
+        {
+          "name": "canInput8",
+          "number": 8,
+          "enabled": false,
+          "timeoutEnabled": false,
+          "timeout": 1000,
+          "ide": false,
+          "startBit": 0,
+          "bitLength": 8,
+          "factor": 1,
+          "offset": 0,
+          "byteOrder": 0,
+          "signed": false,
+          "operator": 0,
+          "operand": 0,
+          "mode": 0,
+          "id": 0
+        },
+        {
+          "name": "canInput9",
+          "number": 9,
+          "enabled": false,
+          "timeoutEnabled": false,
+          "timeout": 1000,
+          "ide": false,
+          "startBit": 0,
+          "bitLength": 8,
+          "factor": 1,
+          "offset": 0,
+          "byteOrder": 0,
+          "signed": false,
+          "operator": 0,
+          "operand": 0,
+          "mode": 0,
+          "id": 0
+        },
+        {
+          "name": "canInput10",
+          "number": 10,
+          "enabled": false,
+          "timeoutEnabled": false,
+          "timeout": 1000,
+          "ide": false,
+          "startBit": 0,
+          "bitLength": 8,
+          "factor": 1,
+          "offset": 0,
+          "byteOrder": 0,
+          "signed": false,
+          "operator": 0,
+          "operand": 0,
+          "mode": 0,
+          "id": 0
+        },
+        {
+          "name": "canInput11",
+          "number": 11,
+          "enabled": false,
+          "timeoutEnabled": false,
+          "timeout": 1000,
+          "ide": false,
+          "startBit": 0,
+          "bitLength": 8,
+          "factor": 1,
+          "offset": 0,
+          "byteOrder": 0,
+          "signed": false,
+          "operator": 0,
+          "operand": 0,
+          "mode": 0,
+          "id": 0
+        },
+        {
+          "name": "canInput12",
+          "number": 12,
+          "enabled": false,
+          "timeoutEnabled": false,
+          "timeout": 1000,
+          "ide": false,
+          "startBit": 0,
+          "bitLength": 8,
+          "factor": 1,
+          "offset": 0,
+          "byteOrder": 0,
+          "signed": false,
+          "operator": 0,
+          "operand": 0,
+          "mode": 0,
+          "id": 0
+        },
+        {
+          "name": "canInput13",
+          "number": 13,
+          "enabled": false,
+          "timeoutEnabled": false,
+          "timeout": 1000,
+          "ide": false,
+          "startBit": 0,
+          "bitLength": 8,
+          "factor": 1,
+          "offset": 0,
+          "byteOrder": 0,
+          "signed": false,
+          "operator": 0,
+          "operand": 0,
+          "mode": 0,
+          "id": 0
+        },
+        {
+          "name": "canInput14",
+          "number": 14,
+          "enabled": false,
+          "timeoutEnabled": false,
+          "timeout": 1000,
+          "ide": false,
+          "startBit": 0,
+          "bitLength": 8,
+          "factor": 1,
+          "offset": 0,
+          "byteOrder": 0,
+          "signed": false,
+          "operator": 0,
+          "operand": 0,
+          "mode": 0,
+          "id": 0
+        },
+        {
+          "name": "canInput15",
+          "number": 15,
+          "enabled": false,
+          "timeoutEnabled": false,
+          "timeout": 1000,
+          "ide": false,
+          "startBit": 0,
+          "bitLength": 8,
+          "factor": 1,
+          "offset": 0,
+          "byteOrder": 0,
+          "signed": false,
+          "operator": 0,
+          "operand": 0,
+          "mode": 0,
+          "id": 0
+        },
+        {
+          "name": "canInput16",
+          "number": 16,
+          "enabled": false,
+          "timeoutEnabled": false,
+          "timeout": 1000,
+          "ide": false,
+          "startBit": 0,
+          "bitLength": 8,
+          "factor": 1,
+          "offset": 0,
+          "byteOrder": 0,
+          "signed": false,
+          "operator": 0,
+          "operand": 0,
+          "mode": 0,
+          "id": 0
+        },
+        {
+          "name": "canInput17",
+          "number": 17,
+          "enabled": false,
+          "timeoutEnabled": false,
+          "timeout": 1000,
+          "ide": false,
+          "startBit": 0,
+          "bitLength": 8,
+          "factor": 1,
+          "offset": 0,
+          "byteOrder": 0,
+          "signed": false,
+          "operator": 0,
+          "operand": 0,
+          "mode": 0,
+          "id": 0
+        },
+        {
+          "name": "canInput18",
+          "number": 18,
+          "enabled": false,
+          "timeoutEnabled": false,
+          "timeout": 1000,
+          "ide": false,
+          "startBit": 0,
+          "bitLength": 8,
+          "factor": 1,
+          "offset": 0,
+          "byteOrder": 0,
+          "signed": false,
+          "operator": 0,
+          "operand": 0,
+          "mode": 0,
+          "id": 0
+        },
+        {
+          "name": "canInput19",
+          "number": 19,
+          "enabled": false,
+          "timeoutEnabled": false,
+          "timeout": 1000,
+          "ide": false,
+          "startBit": 0,
+          "bitLength": 8,
+          "factor": 1,
+          "offset": 0,
+          "byteOrder": 0,
+          "signed": false,
+          "operator": 0,
+          "operand": 0,
+          "mode": 0,
+          "id": 0
+        },
+        {
+          "name": "canInput20",
+          "number": 20,
+          "enabled": false,
+          "timeoutEnabled": false,
+          "timeout": 1000,
+          "ide": false,
+          "startBit": 0,
+          "bitLength": 8,
+          "factor": 1,
+          "offset": 0,
+          "byteOrder": 0,
+          "signed": false,
+          "operator": 0,
+          "operand": 0,
+          "mode": 0,
+          "id": 0
+        },
+        {
+          "name": "canInput21",
+          "number": 21,
+          "enabled": false,
+          "timeoutEnabled": false,
+          "timeout": 1000,
+          "ide": false,
+          "startBit": 0,
+          "bitLength": 8,
+          "factor": 1,
+          "offset": 0,
+          "byteOrder": 0,
+          "signed": false,
+          "operator": 0,
+          "operand": 0,
+          "mode": 0,
+          "id": 0
+        },
+        {
+          "name": "canInput22",
+          "number": 22,
+          "enabled": false,
+          "timeoutEnabled": false,
+          "timeout": 1000,
+          "ide": false,
+          "startBit": 0,
+          "bitLength": 8,
+          "factor": 1,
+          "offset": 0,
+          "byteOrder": 0,
+          "signed": false,
+          "operator": 0,
+          "operand": 0,
+          "mode": 0,
+          "id": 0
+        },
+        {
+          "name": "canInput23",
+          "number": 23,
+          "enabled": false,
+          "timeoutEnabled": false,
+          "timeout": 1000,
+          "ide": false,
+          "startBit": 0,
+          "bitLength": 8,
+          "factor": 1,
+          "offset": 0,
+          "byteOrder": 0,
+          "signed": false,
+          "operator": 0,
+          "operand": 0,
+          "mode": 0,
+          "id": 0
+        },
+        {
+          "name": "canInput24",
+          "number": 24,
+          "enabled": false,
+          "timeoutEnabled": false,
+          "timeout": 1000,
+          "ide": false,
+          "startBit": 0,
+          "bitLength": 8,
+          "factor": 1,
+          "offset": 0,
+          "byteOrder": 0,
+          "signed": false,
+          "operator": 0,
+          "operand": 0,
+          "mode": 0,
+          "id": 0
+        },
+        {
+          "name": "canInput25",
+          "number": 25,
+          "enabled": false,
+          "timeoutEnabled": false,
+          "timeout": 1000,
+          "ide": false,
+          "startBit": 0,
+          "bitLength": 8,
+          "factor": 1,
+          "offset": 0,
+          "byteOrder": 0,
+          "signed": false,
+          "operator": 0,
+          "operand": 0,
+          "mode": 0,
+          "id": 0
+        },
+        {
+          "name": "canInput26",
+          "number": 26,
+          "enabled": false,
+          "timeoutEnabled": false,
+          "timeout": 1000,
+          "ide": false,
+          "startBit": 0,
+          "bitLength": 8,
+          "factor": 1,
+          "offset": 0,
+          "byteOrder": 0,
+          "signed": false,
+          "operator": 0,
+          "operand": 0,
+          "mode": 0,
+          "id": 0
+        },
+        {
+          "name": "canInput27",
+          "number": 27,
+          "enabled": false,
+          "timeoutEnabled": false,
+          "timeout": 1000,
+          "ide": false,
+          "startBit": 0,
+          "bitLength": 8,
+          "factor": 1,
+          "offset": 0,
+          "byteOrder": 0,
+          "signed": false,
+          "operator": 0,
+          "operand": 0,
+          "mode": 0,
+          "id": 0
+        },
+        {
+          "name": "canInput28",
+          "number": 28,
+          "enabled": false,
+          "timeoutEnabled": false,
+          "timeout": 1000,
+          "ide": false,
+          "startBit": 0,
+          "bitLength": 8,
+          "factor": 1,
+          "offset": 0,
+          "byteOrder": 0,
+          "signed": false,
+          "operator": 0,
+          "operand": 0,
+          "mode": 0,
+          "id": 0
+        },
+        {
+          "name": "canInput29",
+          "number": 29,
+          "enabled": false,
+          "timeoutEnabled": false,
+          "timeout": 1000,
+          "ide": false,
+          "startBit": 0,
+          "bitLength": 8,
+          "factor": 1,
+          "offset": 0,
+          "byteOrder": 0,
+          "signed": false,
+          "operator": 0,
+          "operand": 0,
+          "mode": 0,
+          "id": 0
+        },
+        {
+          "name": "canInput30",
+          "number": 30,
+          "enabled": false,
+          "timeoutEnabled": false,
+          "timeout": 1000,
+          "ide": false,
+          "startBit": 0,
+          "bitLength": 8,
+          "factor": 1,
+          "offset": 0,
+          "byteOrder": 0,
+          "signed": false,
+          "operator": 0,
+          "operand": 0,
+          "mode": 0,
+          "id": 0
+        },
+        {
+          "name": "canInput31",
+          "number": 31,
+          "enabled": false,
+          "timeoutEnabled": false,
+          "timeout": 1000,
+          "ide": false,
+          "startBit": 0,
+          "bitLength": 8,
+          "factor": 1,
+          "offset": 0,
+          "byteOrder": 0,
+          "signed": false,
+          "operator": 0,
+          "operand": 0,
+          "mode": 0,
+          "id": 0
+        },
+        {
+          "name": "canInput32",
+          "number": 32,
+          "enabled": false,
+          "timeoutEnabled": false,
+          "timeout": 1000,
+          "ide": false,
+          "startBit": 0,
+          "bitLength": 8,
+          "factor": 1,
+          "offset": 0,
+          "byteOrder": 0,
+          "signed": false,
+          "operator": 0,
+          "operand": 0,
+          "mode": 0,
+          "id": 0
+        }
+      ],
+      "canOutputs": [
+        {
+          "name": "canOutput1",
+          "number": 1,
+          "enabled": true,
+          "input": 87,
+          "ide": false,
+          "startBit": 0,
+          "bitLength": 8,
+          "factor": 1,
+          "offset": 0,
+          "byteOrder": 0,
+          "signed": false,
+          "interval": 100,
+          "id": 1280
+        },
+        {
+          "name": "canOutput2",
+          "number": 2,
+          "enabled": false,
+          "input": 0,
+          "ide": false,
+          "startBit": 0,
+          "bitLength": 8,
+          "factor": 1,
+          "offset": 0,
+          "byteOrder": 0,
+          "signed": false,
+          "interval": 1000,
+          "id": 0
+        },
+        {
+          "name": "canOutput3",
+          "number": 3,
+          "enabled": false,
+          "input": 0,
+          "ide": false,
+          "startBit": 0,
+          "bitLength": 8,
+          "factor": 1,
+          "offset": 0,
+          "byteOrder": 0,
+          "signed": false,
+          "interval": 1000,
+          "id": 0
+        },
+        {
+          "name": "canOutput4",
+          "number": 4,
+          "enabled": false,
+          "input": 0,
+          "ide": false,
+          "startBit": 0,
+          "bitLength": 8,
+          "factor": 1,
+          "offset": 0,
+          "byteOrder": 0,
+          "signed": false,
+          "interval": 1000,
+          "id": 0
+        },
+        {
+          "name": "canOutput5",
+          "number": 5,
+          "enabled": false,
+          "input": 0,
+          "ide": false,
+          "startBit": 0,
+          "bitLength": 8,
+          "factor": 1,
+          "offset": 0,
+          "byteOrder": 0,
+          "signed": false,
+          "interval": 1000,
+          "id": 0
+        },
+        {
+          "name": "canOutput6",
+          "number": 6,
+          "enabled": false,
+          "input": 0,
+          "ide": false,
+          "startBit": 0,
+          "bitLength": 8,
+          "factor": 1,
+          "offset": 0,
+          "byteOrder": 0,
+          "signed": false,
+          "interval": 1000,
+          "id": 0
+        },
+        {
+          "name": "canOutput7",
+          "number": 7,
+          "enabled": false,
+          "input": 0,
+          "ide": false,
+          "startBit": 0,
+          "bitLength": 8,
+          "factor": 1,
+          "offset": 0,
+          "byteOrder": 0,
+          "signed": false,
+          "interval": 1000,
+          "id": 0
+        },
+        {
+          "name": "canOutput8",
+          "number": 8,
+          "enabled": false,
+          "input": 0,
+          "ide": false,
+          "startBit": 0,
+          "bitLength": 8,
+          "factor": 1,
+          "offset": 0,
+          "byteOrder": 0,
+          "signed": false,
+          "interval": 1000,
+          "id": 0
+        },
+        {
+          "name": "canOutput9",
+          "number": 9,
+          "enabled": false,
+          "input": 0,
+          "ide": false,
+          "startBit": 0,
+          "bitLength": 8,
+          "factor": 1,
+          "offset": 0,
+          "byteOrder": 0,
+          "signed": false,
+          "interval": 1000,
+          "id": 0
+        },
+        {
+          "name": "canOutput10",
+          "number": 10,
+          "enabled": false,
+          "input": 0,
+          "ide": false,
+          "startBit": 0,
+          "bitLength": 8,
+          "factor": 1,
+          "offset": 0,
+          "byteOrder": 0,
+          "signed": false,
+          "interval": 1000,
+          "id": 0
+        },
+        {
+          "name": "canOutput11",
+          "number": 11,
+          "enabled": false,
+          "input": 0,
+          "ide": false,
+          "startBit": 0,
+          "bitLength": 8,
+          "factor": 1,
+          "offset": 0,
+          "byteOrder": 0,
+          "signed": false,
+          "interval": 1000,
+          "id": 0
+        },
+        {
+          "name": "canOutput12",
+          "number": 12,
+          "enabled": false,
+          "input": 0,
+          "ide": false,
+          "startBit": 0,
+          "bitLength": 8,
+          "factor": 1,
+          "offset": 0,
+          "byteOrder": 0,
+          "signed": false,
+          "interval": 1000,
+          "id": 0
+        },
+        {
+          "name": "canOutput13",
+          "number": 13,
+          "enabled": false,
+          "input": 0,
+          "ide": false,
+          "startBit": 0,
+          "bitLength": 8,
+          "factor": 1,
+          "offset": 0,
+          "byteOrder": 0,
+          "signed": false,
+          "interval": 1000,
+          "id": 0
+        },
+        {
+          "name": "canOutput14",
+          "number": 14,
+          "enabled": false,
+          "input": 0,
+          "ide": false,
+          "startBit": 0,
+          "bitLength": 8,
+          "factor": 1,
+          "offset": 0,
+          "byteOrder": 0,
+          "signed": false,
+          "interval": 1000,
+          "id": 0
+        },
+        {
+          "name": "canOutput15",
+          "number": 15,
+          "enabled": false,
+          "input": 0,
+          "ide": false,
+          "startBit": 0,
+          "bitLength": 8,
+          "factor": 1,
+          "offset": 0,
+          "byteOrder": 0,
+          "signed": false,
+          "interval": 1000,
+          "id": 0
+        },
+        {
+          "name": "canOutput16",
+          "number": 16,
+          "enabled": false,
+          "input": 0,
+          "ide": false,
+          "startBit": 0,
+          "bitLength": 8,
+          "factor": 1,
+          "offset": 0,
+          "byteOrder": 0,
+          "signed": false,
+          "interval": 1000,
+          "id": 0
+        },
+        {
+          "name": "canOutput17",
+          "number": 17,
+          "enabled": false,
+          "input": 0,
+          "ide": false,
+          "startBit": 0,
+          "bitLength": 8,
+          "factor": 1,
+          "offset": 0,
+          "byteOrder": 0,
+          "signed": false,
+          "interval": 1000,
+          "id": 0
+        },
+        {
+          "name": "canOutput18",
+          "number": 18,
+          "enabled": false,
+          "input": 0,
+          "ide": false,
+          "startBit": 0,
+          "bitLength": 8,
+          "factor": 1,
+          "offset": 0,
+          "byteOrder": 0,
+          "signed": false,
+          "interval": 1000,
+          "id": 0
+        },
+        {
+          "name": "canOutput19",
+          "number": 19,
+          "enabled": false,
+          "input": 0,
+          "ide": false,
+          "startBit": 0,
+          "bitLength": 8,
+          "factor": 1,
+          "offset": 0,
+          "byteOrder": 0,
+          "signed": false,
+          "interval": 1000,
+          "id": 0
+        },
+        {
+          "name": "canOutput20",
+          "number": 20,
+          "enabled": false,
+          "input": 0,
+          "ide": false,
+          "startBit": 0,
+          "bitLength": 8,
+          "factor": 1,
+          "offset": 0,
+          "byteOrder": 0,
+          "signed": false,
+          "interval": 1000,
+          "id": 0
+        },
+        {
+          "name": "canOutput21",
+          "number": 21,
+          "enabled": false,
+          "input": 0,
+          "ide": false,
+          "startBit": 0,
+          "bitLength": 8,
+          "factor": 1,
+          "offset": 0,
+          "byteOrder": 0,
+          "signed": false,
+          "interval": 1000,
+          "id": 0
+        },
+        {
+          "name": "canOutput22",
+          "number": 22,
+          "enabled": false,
+          "input": 0,
+          "ide": false,
+          "startBit": 0,
+          "bitLength": 8,
+          "factor": 1,
+          "offset": 0,
+          "byteOrder": 0,
+          "signed": false,
+          "interval": 1000,
+          "id": 0
+        },
+        {
+          "name": "canOutput23",
+          "number": 23,
+          "enabled": false,
+          "input": 0,
+          "ide": false,
+          "startBit": 0,
+          "bitLength": 8,
+          "factor": 1,
+          "offset": 0,
+          "byteOrder": 0,
+          "signed": false,
+          "interval": 1000,
+          "id": 0
+        },
+        {
+          "name": "canOutput24",
+          "number": 24,
+          "enabled": false,
+          "input": 0,
+          "ide": false,
+          "startBit": 0,
+          "bitLength": 8,
+          "factor": 1,
+          "offset": 0,
+          "byteOrder": 0,
+          "signed": false,
+          "interval": 1000,
+          "id": 0
+        },
+        {
+          "name": "canOutput25",
+          "number": 25,
+          "enabled": false,
+          "input": 0,
+          "ide": false,
+          "startBit": 0,
+          "bitLength": 8,
+          "factor": 1,
+          "offset": 0,
+          "byteOrder": 0,
+          "signed": false,
+          "interval": 1000,
+          "id": 0
+        },
+        {
+          "name": "canOutput26",
+          "number": 26,
+          "enabled": false,
+          "input": 0,
+          "ide": false,
+          "startBit": 0,
+          "bitLength": 8,
+          "factor": 1,
+          "offset": 0,
+          "byteOrder": 0,
+          "signed": false,
+          "interval": 1000,
+          "id": 0
+        },
+        {
+          "name": "canOutput27",
+          "number": 27,
+          "enabled": false,
+          "input": 0,
+          "ide": false,
+          "startBit": 0,
+          "bitLength": 8,
+          "factor": 1,
+          "offset": 0,
+          "byteOrder": 0,
+          "signed": false,
+          "interval": 1000,
+          "id": 0
+        },
+        {
+          "name": "canOutput28",
+          "number": 28,
+          "enabled": false,
+          "input": 0,
+          "ide": false,
+          "startBit": 0,
+          "bitLength": 8,
+          "factor": 1,
+          "offset": 0,
+          "byteOrder": 0,
+          "signed": false,
+          "interval": 1000,
+          "id": 0
+        },
+        {
+          "name": "canOutput29",
+          "number": 29,
+          "enabled": false,
+          "input": 0,
+          "ide": false,
+          "startBit": 0,
+          "bitLength": 8,
+          "factor": 1,
+          "offset": 0,
+          "byteOrder": 0,
+          "signed": false,
+          "interval": 1000,
+          "id": 0
+        },
+        {
+          "name": "canOutput30",
+          "number": 30,
+          "enabled": false,
+          "input": 0,
+          "ide": false,
+          "startBit": 0,
+          "bitLength": 8,
+          "factor": 1,
+          "offset": 0,
+          "byteOrder": 0,
+          "signed": false,
+          "interval": 1000,
+          "id": 0
+        },
+        {
+          "name": "canOutput31",
+          "number": 31,
+          "enabled": false,
+          "input": 0,
+          "ide": false,
+          "startBit": 0,
+          "bitLength": 8,
+          "factor": 1,
+          "offset": 0,
+          "byteOrder": 0,
+          "signed": false,
+          "interval": 1000,
+          "id": 0
+        },
+        {
+          "name": "canOutput32",
+          "number": 32,
+          "enabled": false,
+          "input": 0,
+          "ide": false,
+          "startBit": 0,
+          "bitLength": 8,
+          "factor": 1,
+          "offset": 0,
+          "byteOrder": 0,
+          "signed": false,
+          "interval": 1000,
+          "id": 0
+        }
+      ],
+      "virtualInputs": [
+        {
+          "name": "virtualInput1",
+          "number": 1,
+          "enabled": false,
+          "not0": false,
+          "var0": 0,
+          "cond0": 0,
+          "not1": false,
+          "var1": 0,
+          "cond1": 0,
+          "not2": false,
+          "var2": 0,
+          "mode": 0
+        },
+        {
+          "name": "virtualInput2",
+          "number": 2,
+          "enabled": false,
+          "not0": false,
+          "var0": 0,
+          "cond0": 0,
+          "not1": false,
+          "var1": 0,
+          "cond1": 0,
+          "not2": false,
+          "var2": 0,
+          "mode": 0
+        },
+        {
+          "name": "virtualInput3",
+          "number": 3,
+          "enabled": false,
+          "not0": false,
+          "var0": 0,
+          "cond0": 0,
+          "not1": false,
+          "var1": 0,
+          "cond1": 0,
+          "not2": false,
+          "var2": 0,
+          "mode": 0
+        },
+        {
+          "name": "virtualInput4",
+          "number": 4,
+          "enabled": false,
+          "not0": false,
+          "var0": 0,
+          "cond0": 0,
+          "not1": false,
+          "var1": 0,
+          "cond1": 0,
+          "not2": false,
+          "var2": 0,
+          "mode": 0
+        },
+        {
+          "name": "virtualInput5",
+          "number": 5,
+          "enabled": false,
+          "not0": false,
+          "var0": 0,
+          "cond0": 0,
+          "not1": false,
+          "var1": 0,
+          "cond1": 0,
+          "not2": false,
+          "var2": 0,
+          "mode": 0
+        },
+        {
+          "name": "virtualInput6",
+          "number": 6,
+          "enabled": false,
+          "not0": false,
+          "var0": 0,
+          "cond0": 0,
+          "not1": false,
+          "var1": 0,
+          "cond1": 0,
+          "not2": false,
+          "var2": 0,
+          "mode": 0
+        },
+        {
+          "name": "virtualInput7",
+          "number": 7,
+          "enabled": false,
+          "not0": false,
+          "var0": 0,
+          "cond0": 0,
+          "not1": false,
+          "var1": 0,
+          "cond1": 0,
+          "not2": false,
+          "var2": 0,
+          "mode": 0
+        },
+        {
+          "name": "virtualInput8",
+          "number": 8,
+          "enabled": false,
+          "not0": false,
+          "var0": 0,
+          "cond0": 0,
+          "not1": false,
+          "var1": 0,
+          "cond1": 0,
+          "not2": false,
+          "var2": 0,
+          "mode": 0
+        },
+        {
+          "name": "virtualInput9",
+          "number": 9,
+          "enabled": false,
+          "not0": false,
+          "var0": 0,
+          "cond0": 0,
+          "not1": false,
+          "var1": 0,
+          "cond1": 0,
+          "not2": false,
+          "var2": 0,
+          "mode": 0
+        },
+        {
+          "name": "virtualInput10",
+          "number": 10,
+          "enabled": false,
+          "not0": false,
+          "var0": 0,
+          "cond0": 0,
+          "not1": false,
+          "var1": 0,
+          "cond1": 0,
+          "not2": false,
+          "var2": 0,
+          "mode": 0
+        },
+        {
+          "name": "virtualInput11",
+          "number": 11,
+          "enabled": false,
+          "not0": false,
+          "var0": 0,
+          "cond0": 0,
+          "not1": false,
+          "var1": 0,
+          "cond1": 0,
+          "not2": false,
+          "var2": 0,
+          "mode": 0
+        },
+        {
+          "name": "virtualInput12",
+          "number": 12,
+          "enabled": false,
+          "not0": false,
+          "var0": 0,
+          "cond0": 0,
+          "not1": false,
+          "var1": 0,
+          "cond1": 0,
+          "not2": false,
+          "var2": 0,
+          "mode": 0
+        },
+        {
+          "name": "virtualInput13",
+          "number": 13,
+          "enabled": false,
+          "not0": false,
+          "var0": 0,
+          "cond0": 0,
+          "not1": false,
+          "var1": 0,
+          "cond1": 0,
+          "not2": false,
+          "var2": 0,
+          "mode": 0
+        },
+        {
+          "name": "virtualInput14",
+          "number": 14,
+          "enabled": false,
+          "not0": false,
+          "var0": 0,
+          "cond0": 0,
+          "not1": false,
+          "var1": 0,
+          "cond1": 0,
+          "not2": false,
+          "var2": 0,
+          "mode": 0
+        },
+        {
+          "name": "virtualInput15",
+          "number": 15,
+          "enabled": false,
+          "not0": false,
+          "var0": 0,
+          "cond0": 0,
+          "not1": false,
+          "var1": 0,
+          "cond1": 0,
+          "not2": false,
+          "var2": 0,
+          "mode": 0
+        },
+        {
+          "name": "virtualInput16",
+          "number": 16,
+          "enabled": false,
+          "not0": false,
+          "var0": 0,
+          "cond0": 0,
+          "not1": false,
+          "var1": 0,
+          "cond1": 0,
+          "not2": false,
+          "var2": 0,
+          "mode": 0
+        }
+      ],
+      "wipers": {
+        "name": "wiper",
+        "enabled": false,
+        "mode": 0,
+        "slowInput": 0,
+        "fastInput": 0,
+        "interInput": 0,
+        "onInput": 0,
+        "speedInput": 0,
+        "parkInput": 0,
+        "parkStopLevel": false,
+        "swipeInput": 0,
+        "washInput": 0,
+        "washWipeCycles": 3,
+        "speedMap": [
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          1,
+          2
+        ],
+        "intermitTime": [
+          1000,
+          2000,
+          3000,
+          4000,
+          5000,
+          6000
+        ]
+      },
+      "flashers": [
+        {
+          "name": "flasher1",
+          "number": 1,
+          "enabled": true,
+          "single": false,
+          "input": 1,
+          "onTime": 300,
+          "offTime": 300
+        },
+        {
+          "name": "flasher2",
+          "number": 2,
+          "enabled": false,
+          "single": false,
+          "input": 0,
+          "onTime": 500,
+          "offTime": 500
+        },
+        {
+          "name": "flasher3",
+          "number": 3,
+          "enabled": false,
+          "single": false,
+          "input": 0,
+          "onTime": 500,
+          "offTime": 500
+        },
+        {
+          "name": "flasher4",
+          "number": 4,
+          "enabled": false,
+          "single": false,
+          "input": 0,
+          "onTime": 500,
+          "offTime": 500
+        }
+      ],
+      "starterDisable": {
+        "name": "starterDisable",
+        "enabled": false,
+        "input": 0,
+        "outputsDisabled": [
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false
+        ]
+      },
+      "counters": [
+        {
+          "name": "counter1",
+          "number": 1,
+          "enabled": false,
+          "incInput": 0,
+          "decInput": 0,
+          "resetInput": 0,
+          "minCount": 0,
+          "maxCount": 10,
+          "incEdge": 0,
+          "decEdge": 0,
+          "resetEdge": 0,
+          "wrapAround": false,
+          "holdToReset": false,
+          "resetTime": 2000
+        },
+        {
+          "name": "counter2",
+          "number": 2,
+          "enabled": false,
+          "incInput": 0,
+          "decInput": 0,
+          "resetInput": 0,
+          "minCount": 0,
+          "maxCount": 10,
+          "incEdge": 0,
+          "decEdge": 0,
+          "resetEdge": 0,
+          "wrapAround": false,
+          "holdToReset": false,
+          "resetTime": 2000
+        },
+        {
+          "name": "counter3",
+          "number": 3,
+          "enabled": false,
+          "incInput": 0,
+          "decInput": 0,
+          "resetInput": 0,
+          "minCount": 0,
+          "maxCount": 10,
+          "incEdge": 0,
+          "decEdge": 0,
+          "resetEdge": 0,
+          "wrapAround": false,
+          "holdToReset": false,
+          "resetTime": 2000
+        },
+        {
+          "name": "counter4",
+          "number": 4,
+          "enabled": false,
+          "incInput": 0,
+          "decInput": 0,
+          "resetInput": 0,
+          "minCount": 0,
+          "maxCount": 10,
+          "incEdge": 0,
+          "decEdge": 0,
+          "resetEdge": 0,
+          "wrapAround": false,
+          "holdToReset": false,
+          "resetTime": 2000
+        }
+      ],
+      "conditions": [
+        {
+          "name": "condition1",
+          "number": 1,
+          "enabled": false,
+          "input": 0,
+          "operator": 0,
+          "arg": 0
+        },
+        {
+          "name": "condition2",
+          "number": 2,
+          "enabled": false,
+          "input": 0,
+          "operator": 0,
+          "arg": 0
+        },
+        {
+          "name": "condition3",
+          "number": 3,
+          "enabled": false,
+          "input": 0,
+          "operator": 0,
+          "arg": 0
+        },
+        {
+          "name": "condition4",
+          "number": 4,
+          "enabled": false,
+          "input": 0,
+          "operator": 0,
+          "arg": 0
+        },
+        {
+          "name": "condition5",
+          "number": 5,
+          "enabled": false,
+          "input": 0,
+          "operator": 0,
+          "arg": 0
+        },
+        {
+          "name": "condition6",
+          "number": 6,
+          "enabled": false,
+          "input": 0,
+          "operator": 0,
+          "arg": 0
+        },
+        {
+          "name": "condition7",
+          "number": 7,
+          "enabled": false,
+          "input": 0,
+          "operator": 0,
+          "arg": 0
+        },
+        {
+          "name": "condition8",
+          "number": 8,
+          "enabled": false,
+          "input": 0,
+          "operator": 0,
+          "arg": 0
+        },
+        {
+          "name": "condition9",
+          "number": 9,
+          "enabled": false,
+          "input": 0,
+          "operator": 0,
+          "arg": 0
+        },
+        {
+          "name": "condition10",
+          "number": 10,
+          "enabled": false,
+          "input": 0,
+          "operator": 0,
+          "arg": 0
+        },
+        {
+          "name": "condition11",
+          "number": 11,
+          "enabled": false,
+          "input": 0,
+          "operator": 0,
+          "arg": 0
+        },
+        {
+          "name": "condition12",
+          "number": 12,
+          "enabled": false,
+          "input": 0,
+          "operator": 0,
+          "arg": 0
+        },
+        {
+          "name": "condition13",
+          "number": 13,
+          "enabled": false,
+          "input": 0,
+          "operator": 0,
+          "arg": 0
+        },
+        {
+          "name": "condition14",
+          "number": 14,
+          "enabled": false,
+          "input": 0,
+          "operator": 0,
+          "arg": 0
+        },
+        {
+          "name": "condition15",
+          "number": 15,
+          "enabled": false,
+          "input": 0,
+          "operator": 0,
+          "arg": 0
+        },
+        {
+          "name": "condition16",
+          "number": 16,
+          "enabled": false,
+          "input": 0,
+          "operator": 0,
+          "arg": 0
+        },
+        {
+          "name": "condition17",
+          "number": 17,
+          "enabled": false,
+          "input": 0,
+          "operator": 0,
+          "arg": 0
+        },
+        {
+          "name": "condition18",
+          "number": 18,
+          "enabled": false,
+          "input": 0,
+          "operator": 0,
+          "arg": 0
+        },
+        {
+          "name": "condition19",
+          "number": 19,
+          "enabled": false,
+          "input": 0,
+          "operator": 0,
+          "arg": 0
+        },
+        {
+          "name": "condition20",
+          "number": 20,
+          "enabled": false,
+          "input": 0,
+          "operator": 0,
+          "arg": 0
+        },
+        {
+          "name": "condition21",
+          "number": 21,
+          "enabled": false,
+          "input": 0,
+          "operator": 0,
+          "arg": 0
+        },
+        {
+          "name": "condition22",
+          "number": 22,
+          "enabled": false,
+          "input": 0,
+          "operator": 0,
+          "arg": 0
+        },
+        {
+          "name": "condition23",
+          "number": 23,
+          "enabled": false,
+          "input": 0,
+          "operator": 0,
+          "arg": 0
+        },
+        {
+          "name": "condition24",
+          "number": 24,
+          "enabled": false,
+          "input": 0,
+          "operator": 0,
+          "arg": 0
+        },
+        {
+          "name": "condition25",
+          "number": 25,
+          "enabled": false,
+          "input": 0,
+          "operator": 0,
+          "arg": 0
+        },
+        {
+          "name": "condition26",
+          "number": 26,
+          "enabled": false,
+          "input": 0,
+          "operator": 0,
+          "arg": 0
+        },
+        {
+          "name": "condition27",
+          "number": 27,
+          "enabled": false,
+          "input": 0,
+          "operator": 0,
+          "arg": 0
+        },
+        {
+          "name": "condition28",
+          "number": 28,
+          "enabled": false,
+          "input": 0,
+          "operator": 0,
+          "arg": 0
+        },
+        {
+          "name": "condition29",
+          "number": 29,
+          "enabled": false,
+          "input": 0,
+          "operator": 0,
+          "arg": 0
+        },
+        {
+          "name": "condition30",
+          "number": 30,
+          "enabled": false,
+          "input": 0,
+          "operator": 0,
+          "arg": 0
+        },
+        {
+          "name": "condition31",
+          "number": 31,
+          "enabled": false,
+          "input": 0,
+          "operator": 0,
+          "arg": 0
+        },
+        {
+          "name": "condition32",
+          "number": 32,
+          "enabled": false,
+          "input": 0,
+          "operator": 0,
+          "arg": 0
+        }
+      ],
+      "keypads": [
+        {
+          "name": "keypad1",
+          "number": 1,
+          "enabled": false,
+          "id": 0,
+          "timeoutEnabled": false,
+          "timeout": 0,
+          "model": 6,
+          "backlightBrightness": 63,
+          "dimBacklightBrightness": 32,
+          "backlightButtonColor": 0,
+          "dimmingVar": 0,
+          "buttonBrightness": 63,
+          "dimButtonBrightness": 32,
+          "buttons": [
+            {
+              "name": "button1",
+              "keypadNumber": 1,
+              "number": 1,
+              "enabled": false,
+              "mode": 0,
+              "valColors": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultColor": 0,
+              "valVars": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultVar": 0,
+              "valBlink": [
+                false,
+                false,
+                false,
+                false
+              ],
+              "faultBlink": false,
+              "blinkColors": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultBlinkColor": 0
+            },
+            {
+              "name": "button2",
+              "keypadNumber": 1,
+              "number": 2,
+              "enabled": false,
+              "mode": 0,
+              "valColors": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultColor": 0,
+              "valVars": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultVar": 0,
+              "valBlink": [
+                false,
+                false,
+                false,
+                false
+              ],
+              "faultBlink": false,
+              "blinkColors": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultBlinkColor": 0
+            },
+            {
+              "name": "button3",
+              "keypadNumber": 1,
+              "number": 3,
+              "enabled": false,
+              "mode": 0,
+              "valColors": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultColor": 0,
+              "valVars": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultVar": 0,
+              "valBlink": [
+                false,
+                false,
+                false,
+                false
+              ],
+              "faultBlink": false,
+              "blinkColors": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultBlinkColor": 0
+            },
+            {
+              "name": "button4",
+              "keypadNumber": 1,
+              "number": 4,
+              "enabled": false,
+              "mode": 0,
+              "valColors": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultColor": 0,
+              "valVars": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultVar": 0,
+              "valBlink": [
+                false,
+                false,
+                false,
+                false
+              ],
+              "faultBlink": false,
+              "blinkColors": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultBlinkColor": 0
+            },
+            {
+              "name": "button5",
+              "keypadNumber": 1,
+              "number": 5,
+              "enabled": false,
+              "mode": 0,
+              "valColors": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultColor": 0,
+              "valVars": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultVar": 0,
+              "valBlink": [
+                false,
+                false,
+                false,
+                false
+              ],
+              "faultBlink": false,
+              "blinkColors": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultBlinkColor": 0
+            },
+            {
+              "name": "button6",
+              "keypadNumber": 1,
+              "number": 6,
+              "enabled": false,
+              "mode": 0,
+              "valColors": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultColor": 0,
+              "valVars": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultVar": 0,
+              "valBlink": [
+                false,
+                false,
+                false,
+                false
+              ],
+              "faultBlink": false,
+              "blinkColors": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultBlinkColor": 0
+            },
+            {
+              "name": "button7",
+              "keypadNumber": 1,
+              "number": 7,
+              "enabled": false,
+              "mode": 0,
+              "valColors": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultColor": 0,
+              "valVars": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultVar": 0,
+              "valBlink": [
+                false,
+                false,
+                false,
+                false
+              ],
+              "faultBlink": false,
+              "blinkColors": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultBlinkColor": 0
+            },
+            {
+              "name": "button8",
+              "keypadNumber": 1,
+              "number": 8,
+              "enabled": false,
+              "mode": 0,
+              "valColors": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultColor": 0,
+              "valVars": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultVar": 0,
+              "valBlink": [
+                false,
+                false,
+                false,
+                false
+              ],
+              "faultBlink": false,
+              "blinkColors": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultBlinkColor": 0
+            },
+            {
+              "name": "button9",
+              "keypadNumber": 1,
+              "number": 9,
+              "enabled": false,
+              "mode": 0,
+              "valColors": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultColor": 0,
+              "valVars": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultVar": 0,
+              "valBlink": [
+                false,
+                false,
+                false,
+                false
+              ],
+              "faultBlink": false,
+              "blinkColors": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultBlinkColor": 0
+            },
+            {
+              "name": "button10",
+              "keypadNumber": 1,
+              "number": 10,
+              "enabled": false,
+              "mode": 0,
+              "valColors": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultColor": 0,
+              "valVars": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultVar": 0,
+              "valBlink": [
+                false,
+                false,
+                false,
+                false
+              ],
+              "faultBlink": false,
+              "blinkColors": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultBlinkColor": 0
+            },
+            {
+              "name": "button11",
+              "keypadNumber": 1,
+              "number": 11,
+              "enabled": false,
+              "mode": 0,
+              "valColors": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultColor": 0,
+              "valVars": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultVar": 0,
+              "valBlink": [
+                false,
+                false,
+                false,
+                false
+              ],
+              "faultBlink": false,
+              "blinkColors": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultBlinkColor": 0
+            },
+            {
+              "name": "button12",
+              "keypadNumber": 1,
+              "number": 12,
+              "enabled": false,
+              "mode": 0,
+              "valColors": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultColor": 0,
+              "valVars": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultVar": 0,
+              "valBlink": [
+                false,
+                false,
+                false,
+                false
+              ],
+              "faultBlink": false,
+              "blinkColors": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultBlinkColor": 0
+            },
+            {
+              "name": "button13",
+              "keypadNumber": 1,
+              "number": 13,
+              "enabled": false,
+              "mode": 0,
+              "valColors": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultColor": 0,
+              "valVars": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultVar": 0,
+              "valBlink": [
+                false,
+                false,
+                false,
+                false
+              ],
+              "faultBlink": false,
+              "blinkColors": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultBlinkColor": 0
+            },
+            {
+              "name": "button14",
+              "keypadNumber": 1,
+              "number": 14,
+              "enabled": false,
+              "mode": 0,
+              "valColors": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultColor": 0,
+              "valVars": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultVar": 0,
+              "valBlink": [
+                false,
+                false,
+                false,
+                false
+              ],
+              "faultBlink": false,
+              "blinkColors": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultBlinkColor": 0
+            },
+            {
+              "name": "button15",
+              "keypadNumber": 1,
+              "number": 15,
+              "enabled": false,
+              "mode": 0,
+              "valColors": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultColor": 0,
+              "valVars": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultVar": 0,
+              "valBlink": [
+                false,
+                false,
+                false,
+                false
+              ],
+              "faultBlink": false,
+              "blinkColors": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultBlinkColor": 0
+            },
+            {
+              "name": "button16",
+              "keypadNumber": 1,
+              "number": 16,
+              "enabled": false,
+              "mode": 0,
+              "valColors": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultColor": 0,
+              "valVars": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultVar": 0,
+              "valBlink": [
+                false,
+                false,
+                false,
+                false
+              ],
+              "faultBlink": false,
+              "blinkColors": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultBlinkColor": 0
+            },
+            {
+              "name": "button17",
+              "keypadNumber": 1,
+              "number": 17,
+              "enabled": false,
+              "mode": 0,
+              "valColors": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultColor": 0,
+              "valVars": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultVar": 0,
+              "valBlink": [
+                false,
+                false,
+                false,
+                false
+              ],
+              "faultBlink": false,
+              "blinkColors": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultBlinkColor": 0
+            },
+            {
+              "name": "button18",
+              "keypadNumber": 1,
+              "number": 18,
+              "enabled": false,
+              "mode": 0,
+              "valColors": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultColor": 0,
+              "valVars": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultVar": 0,
+              "valBlink": [
+                false,
+                false,
+                false,
+                false
+              ],
+              "faultBlink": false,
+              "blinkColors": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultBlinkColor": 0
+            },
+            {
+              "name": "button19",
+              "keypadNumber": 1,
+              "number": 19,
+              "enabled": false,
+              "mode": 0,
+              "valColors": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultColor": 0,
+              "valVars": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultVar": 0,
+              "valBlink": [
+                false,
+                false,
+                false,
+                false
+              ],
+              "faultBlink": false,
+              "blinkColors": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultBlinkColor": 0
+            },
+            {
+              "name": "button20",
+              "keypadNumber": 1,
+              "number": 20,
+              "enabled": false,
+              "mode": 0,
+              "valColors": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultColor": 0,
+              "valVars": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultVar": 0,
+              "valBlink": [
+                false,
+                false,
+                false,
+                false
+              ],
+              "faultBlink": false,
+              "blinkColors": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultBlinkColor": 0
+            }
+          ],
+          "dials": [
+            {
+              "name": "dial1",
+              "keypadNumber": 1,
+              "number": 1,
+              "enabled": false,
+              "minCount": 0,
+              "maxCount": 16,
+              "ledOffset": 0
+            },
+            {
+              "name": "dial2",
+              "keypadNumber": 1,
+              "number": 2,
+              "enabled": false,
+              "minCount": 0,
+              "maxCount": 16,
+              "ledOffset": 0
+            }
+          ]
+        },
+        {
+          "name": "keypad2",
+          "number": 2,
+          "enabled": false,
+          "id": 0,
+          "timeoutEnabled": false,
+          "timeout": 0,
+          "model": 6,
+          "backlightBrightness": 63,
+          "dimBacklightBrightness": 32,
+          "backlightButtonColor": 0,
+          "dimmingVar": 0,
+          "buttonBrightness": 63,
+          "dimButtonBrightness": 32,
+          "buttons": [
+            {
+              "name": "button1",
+              "keypadNumber": 2,
+              "number": 1,
+              "enabled": false,
+              "mode": 0,
+              "valColors": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultColor": 0,
+              "valVars": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultVar": 0,
+              "valBlink": [
+                false,
+                false,
+                false,
+                false
+              ],
+              "faultBlink": false,
+              "blinkColors": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultBlinkColor": 0
+            },
+            {
+              "name": "button2",
+              "keypadNumber": 2,
+              "number": 2,
+              "enabled": false,
+              "mode": 0,
+              "valColors": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultColor": 0,
+              "valVars": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultVar": 0,
+              "valBlink": [
+                false,
+                false,
+                false,
+                false
+              ],
+              "faultBlink": false,
+              "blinkColors": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultBlinkColor": 0
+            },
+            {
+              "name": "button3",
+              "keypadNumber": 2,
+              "number": 3,
+              "enabled": false,
+              "mode": 0,
+              "valColors": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultColor": 0,
+              "valVars": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultVar": 0,
+              "valBlink": [
+                false,
+                false,
+                false,
+                false
+              ],
+              "faultBlink": false,
+              "blinkColors": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultBlinkColor": 0
+            },
+            {
+              "name": "button4",
+              "keypadNumber": 2,
+              "number": 4,
+              "enabled": false,
+              "mode": 0,
+              "valColors": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultColor": 0,
+              "valVars": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultVar": 0,
+              "valBlink": [
+                false,
+                false,
+                false,
+                false
+              ],
+              "faultBlink": false,
+              "blinkColors": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultBlinkColor": 0
+            },
+            {
+              "name": "button5",
+              "keypadNumber": 2,
+              "number": 5,
+              "enabled": false,
+              "mode": 0,
+              "valColors": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultColor": 0,
+              "valVars": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultVar": 0,
+              "valBlink": [
+                false,
+                false,
+                false,
+                false
+              ],
+              "faultBlink": false,
+              "blinkColors": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultBlinkColor": 0
+            },
+            {
+              "name": "button6",
+              "keypadNumber": 2,
+              "number": 6,
+              "enabled": false,
+              "mode": 0,
+              "valColors": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultColor": 0,
+              "valVars": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultVar": 0,
+              "valBlink": [
+                false,
+                false,
+                false,
+                false
+              ],
+              "faultBlink": false,
+              "blinkColors": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultBlinkColor": 0
+            },
+            {
+              "name": "button7",
+              "keypadNumber": 2,
+              "number": 7,
+              "enabled": false,
+              "mode": 0,
+              "valColors": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultColor": 0,
+              "valVars": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultVar": 0,
+              "valBlink": [
+                false,
+                false,
+                false,
+                false
+              ],
+              "faultBlink": false,
+              "blinkColors": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultBlinkColor": 0
+            },
+            {
+              "name": "button8",
+              "keypadNumber": 2,
+              "number": 8,
+              "enabled": false,
+              "mode": 0,
+              "valColors": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultColor": 0,
+              "valVars": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultVar": 0,
+              "valBlink": [
+                false,
+                false,
+                false,
+                false
+              ],
+              "faultBlink": false,
+              "blinkColors": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultBlinkColor": 0
+            },
+            {
+              "name": "button9",
+              "keypadNumber": 2,
+              "number": 9,
+              "enabled": false,
+              "mode": 0,
+              "valColors": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultColor": 0,
+              "valVars": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultVar": 0,
+              "valBlink": [
+                false,
+                false,
+                false,
+                false
+              ],
+              "faultBlink": false,
+              "blinkColors": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultBlinkColor": 0
+            },
+            {
+              "name": "button10",
+              "keypadNumber": 2,
+              "number": 10,
+              "enabled": false,
+              "mode": 0,
+              "valColors": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultColor": 0,
+              "valVars": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultVar": 0,
+              "valBlink": [
+                false,
+                false,
+                false,
+                false
+              ],
+              "faultBlink": false,
+              "blinkColors": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultBlinkColor": 0
+            },
+            {
+              "name": "button11",
+              "keypadNumber": 2,
+              "number": 11,
+              "enabled": false,
+              "mode": 0,
+              "valColors": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultColor": 0,
+              "valVars": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultVar": 0,
+              "valBlink": [
+                false,
+                false,
+                false,
+                false
+              ],
+              "faultBlink": false,
+              "blinkColors": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultBlinkColor": 0
+            },
+            {
+              "name": "button12",
+              "keypadNumber": 2,
+              "number": 12,
+              "enabled": false,
+              "mode": 0,
+              "valColors": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultColor": 0,
+              "valVars": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultVar": 0,
+              "valBlink": [
+                false,
+                false,
+                false,
+                false
+              ],
+              "faultBlink": false,
+              "blinkColors": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultBlinkColor": 0
+            },
+            {
+              "name": "button13",
+              "keypadNumber": 2,
+              "number": 13,
+              "enabled": false,
+              "mode": 0,
+              "valColors": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultColor": 0,
+              "valVars": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultVar": 0,
+              "valBlink": [
+                false,
+                false,
+                false,
+                false
+              ],
+              "faultBlink": false,
+              "blinkColors": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultBlinkColor": 0
+            },
+            {
+              "name": "button14",
+              "keypadNumber": 2,
+              "number": 14,
+              "enabled": false,
+              "mode": 0,
+              "valColors": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultColor": 0,
+              "valVars": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultVar": 0,
+              "valBlink": [
+                false,
+                false,
+                false,
+                false
+              ],
+              "faultBlink": false,
+              "blinkColors": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultBlinkColor": 0
+            },
+            {
+              "name": "button15",
+              "keypadNumber": 2,
+              "number": 15,
+              "enabled": false,
+              "mode": 0,
+              "valColors": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultColor": 0,
+              "valVars": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultVar": 0,
+              "valBlink": [
+                false,
+                false,
+                false,
+                false
+              ],
+              "faultBlink": false,
+              "blinkColors": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultBlinkColor": 0
+            },
+            {
+              "name": "button16",
+              "keypadNumber": 2,
+              "number": 16,
+              "enabled": false,
+              "mode": 0,
+              "valColors": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultColor": 0,
+              "valVars": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultVar": 0,
+              "valBlink": [
+                false,
+                false,
+                false,
+                false
+              ],
+              "faultBlink": false,
+              "blinkColors": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultBlinkColor": 0
+            },
+            {
+              "name": "button17",
+              "keypadNumber": 2,
+              "number": 17,
+              "enabled": false,
+              "mode": 0,
+              "valColors": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultColor": 0,
+              "valVars": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultVar": 0,
+              "valBlink": [
+                false,
+                false,
+                false,
+                false
+              ],
+              "faultBlink": false,
+              "blinkColors": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultBlinkColor": 0
+            },
+            {
+              "name": "button18",
+              "keypadNumber": 2,
+              "number": 18,
+              "enabled": false,
+              "mode": 0,
+              "valColors": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultColor": 0,
+              "valVars": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultVar": 0,
+              "valBlink": [
+                false,
+                false,
+                false,
+                false
+              ],
+              "faultBlink": false,
+              "blinkColors": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultBlinkColor": 0
+            },
+            {
+              "name": "button19",
+              "keypadNumber": 2,
+              "number": 19,
+              "enabled": false,
+              "mode": 0,
+              "valColors": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultColor": 0,
+              "valVars": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultVar": 0,
+              "valBlink": [
+                false,
+                false,
+                false,
+                false
+              ],
+              "faultBlink": false,
+              "blinkColors": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultBlinkColor": 0
+            },
+            {
+              "name": "button20",
+              "keypadNumber": 2,
+              "number": 20,
+              "enabled": false,
+              "mode": 0,
+              "valColors": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultColor": 0,
+              "valVars": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultVar": 0,
+              "valBlink": [
+                false,
+                false,
+                false,
+                false
+              ],
+              "faultBlink": false,
+              "blinkColors": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "faultBlinkColor": 0
+            }
+          ],
+          "dials": [
+            {
+              "name": "dial1",
+              "keypadNumber": 2,
+              "number": 1,
+              "enabled": false,
+              "minCount": 0,
+              "maxCount": 16,
+              "ledOffset": 0
+            },
+            {
+              "name": "dial2",
+              "keypadNumber": 2,
+              "number": 2,
+              "enabled": false,
+              "minCount": 0,
+              "maxCount": 16,
+              "ledOffset": 0
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "CanboardDevices": [],
+  "DbcDevices": [],
+  "BlinkMarineKeypads": [],
+  "GrayhillKeypads": []
+}

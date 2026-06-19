@@ -1,5 +1,7 @@
-// Command dingo is a CLI for programming dingoPDM / dingoFW devices over their
-// USB CDC port using the parameter (SDO-style) protocol.
+// Command dingo is a CLI for programming dingoPDM devices over their USB CDC
+// port. It applies dingoConfig .json config files to a device by mapping them to
+// the firmware parameter (SDO-style) protocol — the same file format the
+// dingoConfig GUI reads and writes.
 //
 // Each subcommand owns its own flag set; run "dingo <command> -h" for details.
 // The common device flags are -port, -base (default 222 = 0x0DE) and -bitrate.
@@ -7,7 +9,6 @@ package main
 
 import (
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -15,9 +16,9 @@ import (
 	"sort"
 	"time"
 
-	"dingo-cli/internal/config"
 	"dingo-cli/internal/dingo"
 	"dingo-cli/internal/params"
+	"dingo-cli/internal/pdmcfg"
 	"dingo-cli/internal/slcan"
 )
 
@@ -30,12 +31,9 @@ type command struct {
 }
 
 var commands = []command{
-	{"apply", "declarative name->value config (resets to defaults, then applies) [-burn]", runApply},
+	{"apply", "apply a dingoConfig .json file to the device [-burn]", runApply},
 	{"set", "write one parameter by name: set <name> <value> [-burn]", runSet},
 	{"getn", "read one parameter by name (-name)", runGetn},
-	{"dump", "read all params (-named for name->value, -o file)", runDump},
-	{"defaults", "emit the full registry as a default config (-o file)", runDefaults},
-	{"write", "write raw index/sub/value params from a file [-burn]", runWrite},
 	{"get", "read one raw parameter (-index -sub)", runGet},
 	{"verify", "print the device config CRC", runVerify},
 	{"version", "read the firmware version", runVersion},
@@ -142,9 +140,13 @@ func runApply(args []string) error {
 	fs.Parse(args)
 	rest := fs.Args()
 	if len(rest) != 1 {
-		return errors.New("apply requires exactly one config file argument")
+		return errors.New("apply requires exactly one dingoConfig .json file argument")
 	}
-	cfg, err := loadNamedConfig(rest[0])
+	data, err := os.ReadFile(rest[0])
+	if err != nil {
+		return err
+	}
+	cfg, err := pdmcfg.DeviceParams(data, uint16(*c.base))
 	if err != nil {
 		return err
 	}
@@ -152,7 +154,7 @@ func runApply(args []string) error {
 		if err := cl.WriteAll(cfg); err != nil {
 			return err
 		}
-		fmt.Printf("applied %d params (count + CRC verified)\n", len(cfg))
+		fmt.Printf("applied %d params from %s (count + CRC verified)\n", len(cfg), rest[0])
 		return maybeBurn(cl, *burn)
 	})
 }
@@ -202,75 +204,6 @@ func runGetn(args []string) error {
 		}
 		fmt.Printf("%s = %v (index=0x%04X sub=%d raw=0x%X)\n", d.Name, params.Decode(d, v), d.Index, d.Sub, v)
 		return nil
-	})
-}
-
-func runDump(args []string) error {
-	fs := flag.NewFlagSet("dump", flag.ExitOnError)
-	c := addConn(fs)
-	named := fs.Bool("named", false, "decode to a name->value object")
-	out := fs.String("o", "", "output file (default stdout)")
-	fs.Parse(args)
-	return c.client(func(cl *dingo.Client) error {
-		ps, err := cl.ReadAll()
-		if err != nil {
-			return err
-		}
-		if *named {
-			err = dumpNamed(*out, ps)
-		} else {
-			err = dumpJSON(*out, ps)
-		}
-		if err != nil {
-			return err
-		}
-		fmt.Fprintf(os.Stderr, "read %d params\n", len(ps))
-		return nil
-	})
-}
-
-func runDefaults(args []string) error {
-	fs := flag.NewFlagSet("defaults", flag.ExitOnError)
-	out := fs.String("o", "", "output file (default stdout)")
-	fs.Parse(args)
-	m := make(map[string]interface{}, len(params.All()))
-	for i := range params.All() {
-		d := params.All()[i]
-		m[d.Name] = d.Default
-	}
-	b, err := json.MarshalIndent(m, "", "  ")
-	if err != nil {
-		return err
-	}
-	b = append(b, '\n')
-	if *out == "" {
-		os.Stdout.Write(b)
-	} else if err := os.WriteFile(*out, b, 0o644); err != nil {
-		return err
-	}
-	fmt.Fprintf(os.Stderr, "wrote %d default params\n", len(m))
-	return nil
-}
-
-func runWrite(args []string) error {
-	fs := flag.NewFlagSet("write", flag.ExitOnError)
-	c := addConn(fs)
-	burn := fs.Bool("burn", false, "burn to flash after a successful write")
-	fs.Parse(args)
-	rest := fs.Args()
-	if len(rest) != 1 {
-		return errors.New("write requires exactly one config file argument")
-	}
-	ps, err := loadJSON(rest[0])
-	if err != nil {
-		return err
-	}
-	return c.client(func(cl *dingo.Client) error {
-		if err := cl.WriteAll(ps); err != nil {
-			return err
-		}
-		fmt.Printf("wrote %d params (count + CRC verified)\n", len(ps))
-		return maybeBurn(cl, *burn)
 	})
 }
 
@@ -497,56 +430,6 @@ func txData(data string, id uint) ([]byte, error) {
 		return nil, fmt.Errorf("-id 0x%X exceeds the 11-bit range (max 0x7FF); extended IDs are not supported", id)
 	}
 	return d, nil
-}
-
-func loadJSON(path string) ([]dingo.Param, error) {
-	b, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-	var ps []dingo.Param
-	if err := json.Unmarshal(b, &ps); err != nil {
-		return nil, err
-	}
-	return ps, nil
-}
-
-// loadNamedConfig reads a name->value config object and resolves it to wire
-// params. WriteAll resets the device to firmware defaults before applying these,
-// so the file is the full desired non-default state (declarative).
-func loadNamedConfig(path string) ([]dingo.Param, error) {
-	b, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-	var raw map[string]interface{}
-	if err := json.Unmarshal(b, &raw); err != nil {
-		return nil, err
-	}
-	return config.Resolve(raw)
-}
-
-// dumpNamed writes a name->value config object, decoding each param to its
-// human-friendly form (bool/number/enum name/var name).
-func dumpNamed(path string, ps []dingo.Param) error {
-	return writeJSON(path, config.Named(ps))
-}
-
-func dumpJSON(path string, ps []dingo.Param) error {
-	return writeJSON(path, ps)
-}
-
-func writeJSON(path string, v interface{}) error {
-	b, err := json.MarshalIndent(v, "", "  ")
-	if err != nil {
-		return err
-	}
-	b = append(b, '\n')
-	if path == "" {
-		os.Stdout.Write(b)
-		return nil
-	}
-	return os.WriteFile(path, b, 0o644)
 }
 
 func readFrame(p *slcan.Port, id uint16, timeout time.Duration) []byte {
