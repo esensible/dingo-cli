@@ -43,6 +43,21 @@ const (
 	configTxOffset = 0 // responses from device
 )
 
+// Timing/retry policy. These encode device-behavior assumptions (how long the
+// device may be busy, dump pacing) and are collected here so they're tunable in
+// one place and overridable in tests.
+const (
+	requestTimeout  = 1 * time.Second        // per-attempt wait for a response
+	requestTries    = 6                       // resends; device drops cmds while busy
+	burnTimeout     = 3 * time.Second         // single-shot wait for the burn ack
+	readAllOverall  = 20 * time.Second        // whole-dump ceiling
+	readAllResend   = 800 * time.Millisecond  // resend ReadAll until first response
+	readAllPoll     = 300 * time.Millisecond  // per-iteration receive window
+	readAllQuiet    = 1500 * time.Millisecond // silence after priming => dump done
+	writeBatchSize  = 8                       // params per pacing pause (device RX mailbox is small; large bursts drop)
+	writeBatchPause = 8 * time.Millisecond
+)
+
 // Param is a single configuration parameter.
 type Param struct {
 	Index    uint16 `json:"index"`
@@ -59,12 +74,15 @@ type msg struct {
 
 // Client speaks the param protocol to a device at a given base id.
 type Client struct {
-	port *slcan.Port
-	base uint16
+	port  Transport
+	base  uint16
+	clock Clock
 }
 
-// New wraps an open SLCAN port.
-func New(port *slcan.Port, base uint16) *Client { return &Client{port: port, base: base} }
+// New wraps a transport (an open SLCAN port in production, a fake in tests).
+func New(port Transport, base uint16) *Client {
+	return &Client{port: port, base: base, clock: realClock{}}
+}
 
 func (c *Client) Close() error { return c.port.Close() }
 
@@ -97,8 +115,8 @@ func decode(f slcan.Frame) msg {
 // recvResp returns the next protocol response (on base+0), skipping cyclic
 // traffic, until the deadline.
 func (c *Client) recvResp(deadline time.Time) (msg, bool) {
-	for time.Now().Before(deadline) {
-		f, err := c.port.Recv(time.Until(deadline))
+	for c.clock.Now().Before(deadline) {
+		f, err := c.port.Recv(deadline.Sub(c.clock.Now()))
 		if err != nil {
 			return msg{}, false
 		}
@@ -112,14 +130,13 @@ func (c *Client) recvResp(deadline time.Time) (msg, bool) {
 
 // requestBytes sends a raw 8-byte command and waits for a response with
 // wantCmd, resending if nothing relevant arrives (commands can be dropped while
-// the device is busy).
+// the device is busy). Use only for idempotent commands.
 func (c *Client) requestBytes(d []byte, wantCmd uint8) (msg, error) {
-	const tries = 6
-	for i := 0; i < tries; i++ {
+	for i := 0; i < requestTries; i++ {
 		if err := c.sendBytes(d); err != nil {
 			return msg{}, err
 		}
-		deadline := time.Now().Add(1 * time.Second)
+		deadline := c.clock.Now().Add(requestTimeout)
 		for {
 			m, ok := c.recvResp(deadline)
 			if !ok {
@@ -130,7 +147,26 @@ func (c *Client) requestBytes(d []byte, wantCmd uint8) (msg, error) {
 			}
 		}
 	}
-	return msg{}, fmt.Errorf("no response (want cmd %d) after %d tries", wantCmd, tries)
+	return msg{}, fmt.Errorf("no response (want cmd %d) after %d tries", wantCmd, requestTries)
+}
+
+// requestOnce sends a command exactly once and waits up to timeout for the
+// response. Use for non-idempotent commands (e.g. Burn) where a resend would
+// repeat a side effect.
+func (c *Client) requestOnce(d []byte, wantCmd uint8, timeout time.Duration) (msg, error) {
+	if err := c.sendBytes(d); err != nil {
+		return msg{}, err
+	}
+	deadline := c.clock.Now().Add(timeout)
+	for {
+		m, ok := c.recvResp(deadline)
+		if !ok {
+			return msg{}, fmt.Errorf("no response (want cmd %d) within %v", wantCmd, timeout)
+		}
+		if m.Cmd == wantCmd {
+			return m, nil
+		}
+	}
 }
 
 func (c *Client) request(cmd uint8, index uint16, sub uint8, val uint32, wantCmd uint8) (msg, error) {
@@ -150,18 +186,18 @@ func (c *Client) ReadAll() ([]Param, error) {
 	var out []Param
 	primed := false
 	var lastSend, lastRsp time.Time
-	deadline := time.Now().Add(20 * time.Second)
+	deadline := c.clock.Now().Add(readAllOverall)
 
-	for time.Now().Before(deadline) {
-		if !primed && time.Since(lastSend) > 800*time.Millisecond {
+	for c.clock.Now().Before(deadline) {
+		if !primed && c.clock.Since(lastSend) > readAllResend {
 			if err := c.send(cmdReadAll, 0, 0, 0); err != nil {
 				return nil, err
 			}
-			lastSend = time.Now()
+			lastSend = c.clock.Now()
 		}
-		m, ok := c.recvResp(time.Now().Add(300 * time.Millisecond))
+		m, ok := c.recvResp(c.clock.Now().Add(readAllPoll))
 		if !ok {
-			if primed && time.Since(lastRsp) > 1500*time.Millisecond {
+			if primed && c.clock.Since(lastRsp) > readAllQuiet {
 				break // dump finished (completion marker may have been dropped)
 			}
 			continue
@@ -169,7 +205,7 @@ func (c *Client) ReadAll() ([]Param, error) {
 		switch m.Cmd {
 		case cmdReadAll, cmdReadAllRsp:
 			primed = true
-			lastRsp = time.Now()
+			lastRsp = c.clock.Now()
 			if m.Cmd == cmdReadAllRsp {
 				out = append(out, Param{Index: m.Index, SubIndex: m.SubIndex, Value: m.Value})
 			}
@@ -186,13 +222,15 @@ func (c *Client) ReadAll() ([]Param, error) {
 	if !primed {
 		return nil, fmt.Errorf("ReadAll: device not responding")
 	}
-	// No completion marker — verify the collected set against the device's own CRC.
+	// No completion marker. If every param actually arrived (only the marker was
+	// dropped), our collected set equals the device's live config in registry
+	// order, so its CRC matches CheckCrc; otherwise frames were lost and we fail.
 	devCrc, err := c.CheckCrc()
 	if err != nil {
 		return out, fmt.Errorf("read ended without completion and CRC check failed (%d params): %w", len(out), err)
 	}
 	if got := crcOf(out); got != devCrc {
-		return out, fmt.Errorf("read CRC mismatch (frames lost): device=%08X local=%08X over %d params", devCrc, got, len(out))
+		return out, fmt.Errorf("read incomplete (frames lost): device=%08X local=%08X over %d params", devCrc, got, len(out))
 	}
 	return out, nil
 }
@@ -207,8 +245,8 @@ func (c *Client) WriteAll(params []Param) error {
 		if err := c.send(cmdWriteAllVal, p.Index, p.SubIndex, p.Value); err != nil {
 			return err
 		}
-		if (i+1)%50 == 0 {
-			time.Sleep(10 * time.Millisecond) // pace batches as the firmware does
+		if (i+1)%writeBatchSize == 0 {
+			c.clock.Sleep(writeBatchPause) // pace batches as the firmware does
 		}
 	}
 	resp, err := c.request(cmdWriteAllComplete, uint16(len(params)), 0, 0, cmdWriteAllComplete)
@@ -216,7 +254,7 @@ func (c *Client) WriteAll(params []Param) error {
 		return fmt.Errorf("WriteAll complete: %w", err)
 	}
 	if int(resp.Index) != len(params) {
-		return fmt.Errorf("write count mismatch: device staged %d of %d", resp.Index, len(params))
+		return fmt.Errorf("write count mismatch: device staged %d of %d (a param was dropped or rejected as out of range)", resp.Index, len(params))
 	}
 	if want := crcOf(params); resp.Value != want {
 		return fmt.Errorf("write CRC mismatch: device=%08X local=%08X", resp.Value, want)
@@ -235,9 +273,9 @@ func (c *Client) CheckCrc() (uint32, error) {
 
 // Burn persists the live config to flash and verifies the device's ack. The
 // firmware requires the magic payload [30,1,3,8] and replies with WriteConfig()'s
-// result in byte 4 (1 = success).
+// result in byte 4 (1 = success). Sent single-shot: a resend would re-flash.
 func (c *Client) Burn() error {
-	resp, err := c.requestBytes([]byte{cmdBurnSettings, 1, 3, 8, 0, 0, 0, 0}, cmdBurnSettings)
+	resp, err := c.requestOnce([]byte{cmdBurnSettings, 1, 3, 8, 0, 0, 0, 0}, cmdBurnSettings, burnTimeout)
 	if err != nil {
 		return err
 	}
@@ -251,6 +289,29 @@ func (c *Client) Burn() error {
 // "BOOTL" payload; fire-and-forget (the device resets, so there is no ack).
 func (c *Client) Bootloader() error {
 	return c.sendBytes([]byte{cmdBootloader, 'B', 'O', 'O', 'T', 'L', 0, 0})
+}
+
+// SetParam writes one parameter to the live config (persisted only by Burn) and
+// verifies the device echoes back the stored value. The firmware sends no reply
+// if the param is unknown or out of range, so a timeout means rejection.
+func (c *Client) SetParam(index uint16, sub uint8, val uint32) error {
+	resp, err := c.requestBytes(frameBytes(cmdWrite, index, sub, val), cmdWrite)
+	if err != nil {
+		return fmt.Errorf("set: no ack (unknown param or out of range): %w", err)
+	}
+	if resp.Value != val {
+		return fmt.Errorf("set: wrote 0x%X but device stored 0x%X", val, resp.Value)
+	}
+	return nil
+}
+
+// ReadParam reads a single parameter value (request/response, no burst).
+func (c *Client) ReadParam(index uint16, sub uint8) (uint32, error) {
+	resp, err := c.requestBytes(frameBytes(cmdRead, index, sub, 0), cmdRead)
+	if err != nil {
+		return 0, err
+	}
+	return resp.Value, nil
 }
 
 // Version reads the firmware version (major, minor, build).

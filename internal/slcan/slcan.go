@@ -79,6 +79,28 @@ func Open(name string, bitrate int) (*Port, error) {
 	return port, nil
 }
 
+// WriteRaw opens the port and writes raw bytes with NO SLCAN framing and no
+// open sequence. Old dingoPDM firmware reads up to 8 raw CDC bytes as a CAN
+// frame (forcing the id itself), rather than speaking SLCAN on receive.
+func WriteRaw(name string, data []byte) error {
+	p, err := serial.Open(name, &serial.Mode{
+		BaudRate: 115200,
+		DataBits: 8,
+		Parity:   serial.NoParity,
+		StopBits: serial.OneStopBit,
+	})
+	if err != nil {
+		return err
+	}
+	defer p.Close()
+	if _, err := p.Write(data); err != nil {
+		return err
+	}
+	// Let the bytes flush out before the deferred Close tears the port down.
+	time.Sleep(200 * time.Millisecond)
+	return nil
+}
+
 // Close stops the reader, closes the SLCAN channel and the serial port.
 func (port *Port) Close() error {
 	close(port.done)
@@ -107,6 +129,18 @@ func (port *Port) Recv(timeout time.Duration) (Frame, error) {
 		return f, nil
 	case <-time.After(timeout):
 		return Frame{}, ErrTimeout
+	}
+}
+
+// Flush discards all currently-buffered frames without blocking, so a
+// subsequent Recv returns a live frame rather than backlog.
+func (port *Port) Flush() {
+	for {
+		select {
+		case <-port.frames:
+		default:
+			return
+		}
 	}
 }
 
