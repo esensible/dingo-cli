@@ -29,6 +29,10 @@ surface. The CLI only reads the file (never rewrites it), selects the PDM whose
 `baseId` matches `-base`, and verifies the device's parameter count + CRC, so a
 successful `apply` means the device holds exactly the file.
 
+`-port` is the device's serial port (macOS: typically `/dev/cu.usbmodem*`; Linux:
+`/dev/ttyACM*`). `-base` is the target device's `baseId` (default 222). `-burn`
+persists to flash; without it the config is live but reverts on power-cycle.
+
 A complete, real example file lives at `internal/pdmcfg/testdata/example.json` —
 read it for the full shape; start from a copy and edit.
 
@@ -36,17 +40,31 @@ read it for the full shape; start from a copy and edit.
 
 - **All enums and all variable references are plain integers** in the JSON (never
   strings). E.g. `"resetMode": 2`, `"mode": 0`, `"input": 119`.
+- **CAN ids are decimal integers** — JSON has no hex, so write `0x642` as `1602`.
 - **Floats** are JSON numbers (`"currentLimit": 13`, `"arg": 13.5`). Integer-valued
   floats may be written without a decimal.
-- Every function object has a `"name"` (free text) and a 1-based `"number"`. The
-  **`number` must equal its position in the array** (outputs[0].number == 1). They
-  are identifiers only; they map to no device parameter.
-- The CLI iterates the **actual array lengths** in the file, so reduced-output
-  variants (dingoPDM-Max = 4 outputs) just have shorter arrays. Default full PDM
-  counts are below.
-- Defaults / `false` / `0` are written explicitly (the GUI never omits fields). When
-  hand-writing, include every field of any object you create, or copy a full object
-  from `example.json` and change what you need.
+- **Arrays are addressed by position, not by `number`.** `outputs[0]` is Output 1,
+  `outputs[3]` is Output 4 — 0-based array index `i` = hardware unit `i+1` = the
+  var-map "n" of `i+1`. Every object also carries a `"name"` (free text) and a
+  1-based `"number"`; both are cosmetic (the projection ignores them), but keep
+  `number` == position+1 for GUI compatibility. (Keypad `buttons`/`dials` objects
+  additionally carry `keypadNumber`, the 1-based owning keypad.)
+- **What you omit resets to the firmware default on `apply`.** `apply` first resets
+  every parameter to its firmware default, then applies what the file contains — so
+  an omitted field, or an omitted array *tail* (e.g. only `outputs[0..3]`), takes the
+  firmware default (NOT JSON zero). A minimal/partial file is therefore valid to
+  `apply`. (Arrays must be a dense prefix from index 0 — you can't skip the middle,
+  because position is the instance index.)
+- **For a file you will also open in the dingoConfig GUI, keep objects and arrays
+  complete.** The GUI fills missing JSON with type-zero (e.g. `currentLimit` 0, not
+  the firmware default 20), so a partial file looks wrong there. The reliable way to
+  author a complete file is to **copy `internal/pdmcfg/testdata/example.json` and edit
+  it** — it contains every object with firmware-default values. Per-field default
+  values are not all enumerated in this skill; that example is the source for them.
+- Full-PDM array counts: `inputs` 2, `outputs` 8, `canInputs` 32, `canOutputs` 32,
+  `virtualInputs` 16, `flashers` 4, `counters` 4, `conditions` 32, `keypads` 2
+  (each 20 buttons, 2 dials); `wipers` and `starterDisable` are single objects.
+  Reduced variants (dingoPDM-Max = 4 outputs) just use shorter arrays.
 
 ## Top-level structure
 
@@ -112,10 +130,24 @@ referenced variable is non-zero/true.
 | 123 + (n-1) | Cond{n} | n=1..32 |
 | 155 + (n-1) | Counter{n} | n=1..4 |
 | 159..164 | Wiper Slow/Fast/Park/Inter/Wash/Swipe out | in that order |
-| 165..216 | Keypad vars | per keypad: 20 buttons, 2 dials, 4 analog (26 each) |
+| 165 + 26·(k-1) | Keypad{k} block (k=1,2) | within block: button{b} = base+(b-1); dial{d} = base+20+(d-1); analog{a} = base+22+(a-1) |
 
-Total var-map size = 217 (indices 0..216). Examples: `DigIn1`=5, `AlwaysTrue`=1,
-`Flasher1`=119, `Out1Active`=87, `CanIn1Out`=7, `CanIn2Out`=9, `VirtIn1`=71.
+Total var-map size = 217 (indices 0..216). Worked examples: `DigIn1`=5,
+`AlwaysTrue`=1, `Flasher1`=119, `Out1Active`=87, `Out4Active`=87+4·(4-1)=99,
+`Out8Fault`=90+4·(8-1)=118, `CanIn1Out`=7, `CanIn2Out`=9, `CanIn3Out`=7+2·(3-1)=11,
+`CanIn32Out`=69 (`CanIn32Val`=70), `VirtIn1`=71, `Cond1`=123, `Counter1`=155,
+`Keypad1Button3`=165+(3-1)=167, `Keypad2Dial1`=191+20=211.
+
+Notes on variables:
+- **Boolean consumers** (`output.input`, `flasher.input`, `virtualInput.varN`, etc.)
+  treat the variable as `!= 0`. Wiring a *numeric* var (`BattVolt`, `BoardTemp`,
+  `Out{n}Current`, `CanIn{n}Val`, `Counter{n}`) straight into a boolean input means
+  "on whenever non-zero" — usually not what you want. To threshold a numeric value,
+  route it through a **condition** (→ `Cond{n}`) or a CAN input's `Out`, then
+  reference that boolean.
+- **Units** of the analog system vars: `BattVolt` = volts, `BoardTemp` = °C,
+  `Out{n}Current` = amps. (A low-voltage condition's `arg` is therefore in volts.)
+- A function with `enabled: false` outputs its variable as 0/false.
 
 ## Enums (integer values)
 
@@ -159,24 +191,48 @@ window) or above `inrushCurrentLimit` (during it) trips the output OFF.
   commanded off (its `input` goes false).
 - `Endless`: retry every `resetTime` ms forever.
 The output is never held on during/after an overcurrent — it fails safe to OFF. A
-hardware fault (dead short/over-temp) latches off regardless of mode.
+hardware fault (dead short/over-temp) latches off regardless of mode. Choosing by load:
+motors/pumps → `Count` or `Endless` (self-recover from transient trips); lamps/fixed
+relays → `Count`, or `None` to hard-latch on fault. If a scenario doesn't specify,
+`Count` with `resetCountLimit` 3-5 is a safe default.
 Inrush: for `inrushTime` ms after turn-on, the limit is `inrushCurrentLimit`; after
 that, `currentLimit`. Set inrush ≥ motor/lamp surge and `inrushTime` long enough to
 cover startup but short enough to still protect a stalled load.
 
+**Gating / overriding an output:** an output has exactly one driver (`input`) and no
+separate inhibit/disable field (the only built-in force-off is `starterDisable`, and
+that's specific to engine cranking). To force an output off under some condition, fold
+it into the driver via a virtualInput — set `output.input` to a `VirtIn{n}` computed
+as `normalDriver AND NOT override` (see virtualInputs for the exact field values).
+
 ### inputs[] (digital inputs, 2)
 `enabled` · `invert` bool · `mode` InputMode · `debounceTime` ms · `pull` InputPull.
-Exposes `DigIn{number}`. For a level switch that is closed while ON: `mode`=Momentary,
-and set `invert`/`pull` to match wiring (switch-to-ground + `pull`=Up needs
-`invert`=true so closed→true).
+Exposes `DigIn{n}` (n = array position + 1). For a maintained/level switch closed while ON:
+`mode`=Momentary (the var follows the contact), and set `invert`/`pull` to match
+wiring (switch-to-ground + `pull`=Up needs `invert`=true so closed→true). For a
+**momentary push-button that toggles** an output on/off (each press flips it):
+`mode`=Latching — `DigIn{n}` then flips on each press (starts false at boot), and you
+drive the output directly from it. Latching behaves the same on `inputs`,
+`canInputs`, and `virtualInputs`.
 
 ### canInputs[] (decode a CAN signal, 32)
 `enabled` · `timeoutEnabled` bool · `timeout` ms · `ide` bool (extended id) ·
 `id` CAN id · `startBit` 0..63 · `bitLength` 1..32 · `byteOrder` ByteOrder ·
 `signed` bool · `factor` float · `offset` float · `operator` Operator ·
 `operand` float · `mode` InputMode.
+- `id` is the CAN id as a **decimal integer** (0x642 → 1602). Set `ide`=false for a
+  standard 11-bit id (0..0x7FF); `ide`=true for an extended 29-bit id (put the full
+  29-bit value, as decimal, in `id`).
+- `startBit` is the **absolute bit index in the frame**: byte B, bit b = `8*B + b`
+  (LittleEndian/Intel). So byte0 bit0 = 0; byte4 bit0 = 32. BigEndian/Motorola uses a
+  different bit numbering — prefer LittleEndian for single-bit flags.
 - Decodes the frame field to **`CanIn{n}Val`** = raw·factor + offset.
 - **`CanIn{n}Out`** = boolean result of `Val <operator> operand`, then InputMode.
+  `operand` is in the **same decoded/engineering units as `Val`** (after factor+offset)
+  — e.g. for RPM>500 use `operand`=500, not the raw count.
+- **Threshold a CAN signal here** (in this canInput's `operator`/`operand`, then use
+  `CanIn{n}Out`). Use a separate `condition` only to threshold a *non-CAN* variable
+  (BattVolt, a counter, etc.) or to compare `CanIn{n}Val` against something else.
 - To turn "bit B of a frame == 1" into a boolean: `startBit`=B, `bitLength`=1,
   `factor`=1, `offset`=0, `operator`=0 (Equal), `operand`=1, `mode`=0; reference
   **`CanIn{n}Out`** in logic.
@@ -187,6 +243,10 @@ and set `invert`/`pull` to match wiring (switch-to-ground + `pull`=Up needs
 `enabled` · `input` var ref (the value to send) · `ide` · `id` · `startBit` ·
 `bitLength` · `byteOrder` · `signed` · `factor` · `offset` · `interval` ms.
 - Encodes `input`'s value (·factor+offset) into the frame, sent every `interval` ms.
+  `bitLength` must cover the value's range (a boolean needs 1; a 0..255 counter needs 8).
+- `id`/`ide`/`startBit` as for canInputs (decimal id; `ide`=true for 29-bit;
+  `startBit` = `8*byte + bit`). To send a boolean state into a byte, use
+  `bitLength`=1 at `startBit` = `8*byte`.
 - **Multiple canOutputs with the same `id` are merged into one frame.** The frame's
   DLC is auto-sized to the highest byte any of them writes. Use a second canOutput on
   the same id at a higher `startBit` to pad the DLC if a receiver requires a minimum
@@ -194,19 +254,31 @@ and set `invert`/`pull` to match wiring (switch-to-ground + `pull`=Up needs
 
 ### virtualInputs[] (boolean logic, 16)
 `enabled` · `not0` `var0` `cond0` · `not1` `var1` `cond1` · `not2` `var2` · `mode`.
-Computes `(±var0 cond0 ±var1) cond1 ±var2`, where `notN` inverts that term and
-`condN` is BoolOperator (And/Or/Nor). Exposes `VirtIn{n}`. For a simple two-term OR,
-set `var2`=0 (AlwaysFalse) and `cond1`=Or. `mode` Momentary tracks the level.
+Computes `(±var0 cond0 ±var1) cond1 ±var2`, where each `varN` is a var-map index,
+`notN` inverts **its own operand `varN`**, and `condN` is BoolOperator (And/Or/Nor).
+Exposes `VirtIn{n}`. `mode` Momentary tracks the level.
+
+For a **two-term** expression, set `var2`=0 (AlwaysFalse) and **`cond1`=Or** — the
+trailing `... OR false` is a no-op regardless of the first operator. Do NOT use
+`cond1`=And with `var2`=0 (that forces the whole result false), nor `cond1`=Nor (that
+inverts it). Worked example — "DigIn2 AND NOT Cond1": `var0`=6, `not0`=false,
+`cond0`=0 (And), `var1`=123 (Cond1), `not1`=true, `cond1`=1 (Or), `var2`=0,
+`not2`=false, `mode`=0. This is the standard way to gate an output: point the
+output's `input` at this `VirtIn{n}`.
 
 ### conditions[] (compare a value, 32)
-`enabled` · `input` var ref · `operator` Operator · `arg` float. Exposes `Cond{n}`
-= `value(input) <operator> arg`. E.g. low-voltage: input=BattVolt(4), operator=LessThan(3),
-arg=11.5.
+`enabled` · `input` var ref · `operator` Operator · `arg` float (in the `input` var's
+units). Exposes `Cond{n}` = `value(input) <operator> arg`. E.g. low-voltage:
+input=BattVolt(4), operator=LessThan(3), arg=11.5.
 
 ### counters[] (4)
 `enabled` · `incInput` `decInput` `resetInput` var refs · `minCount` `maxCount` 0..255 ·
 `incEdge` `decEdge` `resetEdge` InputEdge · `wrapAround` bool · `holdToReset` bool ·
-`resetTime` ms. Exposes `Counter{n}`.
+`resetTime` ms. Exposes `Counter{n}` = the current count (a **numeric** var — threshold
+it via a condition to use as a boolean). An "edge" is a transition of the referenced
+var's boolean (non-zero) state per `incEdge`/`decEdge`. **`maxCount` clamps the count**
+(template default 10) — raise it (up to 255) for open-ended counting. `minCount` is the
+decrement floor; with `wrapAround` the count rolls between `minCount` and `maxCount`.
 
 ### flashers[] (4)
 `enabled` · `single` bool (one cycle vs continuous) · `input` var ref (runs while
@@ -215,20 +287,141 @@ true) · `onTime` `offTime` ms. Exposes `Flasher{n}`.
 ### wipers {} (single object)
 `enabled` · `mode` WiperMode · `slowInput` `fastInput` `interInput` `onInput`
 `speedInput` `parkInput` `swipeInput` `washInput` var refs · `parkStopLevel` bool ·
-`washWipeCycles` int · `speedMap` [8] of WiperSpeed · `intermitTime` [6] ms.
+`washWipeCycles` 0..10 · `speedMap` [8] of WiperSpeed · `intermitTime` [6] ms.
+- **`mode` chooses how speed is selected:** `DigIn` (0) uses the discrete `slowInput` /
+  `fastInput` / `interInput` booleans (speedInput/speedMap ignored); `IntIn` (1) uses
+  `speedInput` — a **numeric** var whose value 0..7 indexes `speedMap[value]`, each entry
+  a WiperSpeed (Slow/Fast/Intermittent1..6/Park) — (discrete inputs ignored); `MixIn`
+  (2) uses both. `onInput` is the master on; `washInput`/`swipeInput`/`parkInput` apply
+  in all modes.
+- `speedMap` [8] = the WiperSpeed for selector positions 0..7 (e.g. `[3,4,5,6,7,8,1,2]`
+  = Intermittent1..6, Slow, Fast). `intermitTime[i]` = the dwell (ms) for Intermittent(i+1).
+- Output vars (var-map 159..164, in order): `WiperSlowOut`, `WiperFastOut`,
+  `WiperParkOut`, `WiperInterOut`, `WiperWashOut`, `WiperSwipeOut` — point the relevant
+  output `input`s at these. **At Fast speed BOTH `WiperSlowOut` and `WiperFastOut` are
+  asserted** (Slow asserts only SlowOut), so wire the motor's slow brush to SlowOut and
+  the fast brush to FastOut.
+- `parkInput` = the park-position switch var; `parkStopLevel` picks which level of it
+  means "at park" (false = parked when low, true = parked when high). Leave both at
+  default if there's no park switch.
 
 ### starterDisable {} (single object)
 `enabled` · `input` var ref (asserted while cranking) · `outputsDisabled` [8] bool
 (which outputs to force off while `input` is true).
 
 ### keypads[] (2; CAN keypads)
-`enabled` · `id` node id 0..127 · `timeoutEnabled` · `timeout` · `model` KeypadModel ·
-`backlightBrightness` 0..63 · `dimBacklightBrightness` 0..63 · `backlightButtonColor` ·
-`dimmingVar` var ref · `buttonBrightness` 0..63 · `dimButtonBrightness` 0..63 ·
-`buttons` [20] · `dials` [2].
-- button: `enabled` · `mode` · `valColors`[4] · `faultColor` · `valVars`[4] var refs ·
-  `faultVar` · `valBlink`[4] bool · `faultBlink` · `blinkColors`[4] · `faultBlinkColor`.
-- dial: `enabled` · `minCount` · `maxCount` · `ledOffset`.
+`enabled` · `id` node id 0..127 · `timeoutEnabled` · `timeout` ms · `model` KeypadModel ·
+`backlightBrightness` 0..63 · `dimBacklightBrightness` 0..63 · `backlightButtonColor`
+(BlinkMarineBacklightColor) · `dimmingVar` var ref · `buttonBrightness` 0..63 ·
+`dimButtonBrightness` 0..63 · `buttons` [20] · `dials` [2].
+- button (also carries `keypadNumber` = owning keypad, 1-based, and `number`):
+  `enabled` · `mode` InputMode · `valColors`[4] (BlinkMarineButtonColor) · `faultColor`
+  (BlinkMarineButtonColor) · `valVars`[4] var refs · `faultVar` var ref · `valBlink`[4]
+  bool · `faultBlink` bool · `blinkColors`[4] (BlinkMarineButtonColor) ·
+  `faultBlinkColor` (BlinkMarineButtonColor).
+- dial (also carries `keypadNumber`, `number`): `enabled` · `minCount` 0..16 ·
+  `maxCount` 0..16 · `ledOffset` 0..16. Its var `Keypad{k}Dial{d}` is **numeric** (the
+  current count, `minCount..maxCount`) — use it for numeric consumers like wiper
+  `speedInput`, sizing `maxCount` to the consumer's range (e.g. 7 for the 8 speedMap
+  positions). `dimmingVar` true selects the `dim*Brightness` values instead of the full
+  `*Brightness`.
+- **BlinkMarineButtonColor** (button colors): Off=0, Red=1, Green=2, Orange=3, Blue=4,
+  Violet=5, Cyan=6, White=7. **BlinkMarineBacklightColor** (`backlightButtonColor`):
+  Off=0, Red=1, Green=2, Blue=3, Yellow=4, Cyan=5, Violet=6, White=7, Amber=8,
+  YellowGreen=9. (The two palettes differ — e.g. Blue is 4 for buttons but 3 for
+  backlight — don't mix them.)
+- Keypad var-map sub-layout (the 26 vars/keypad in the Variables table): button1..20 =
+  base+0..+19, dial1..2 = base+20..+21, analog1..4 = base+22..+25 (Keypad1 base = 165,
+  Keypad2 base = 191).
+- **A button's pressed state is its var** `Keypad{k}Button{b}` (the sub-layout index
+  above). With button `mode`=Momentary it's true while held; `mode`=Latching it flips
+  on each press (Latching applies to keypad buttons too). **To drive an output/logic
+  from a button, reference that var** in the consumer's `input`/`varN`.
+- `valVars`/`valColors`/`valBlink` are **LED feedback, not the button's state**: LED
+  shows `valColors[i]` while `valVars[i]` is true (`valBlink[i]` blinks it between
+  `valColors[i]` and `blinkColors[i]`); e.g. set `valVars[0]` to the output's
+  `Out{n}Active` to light the button when the load is on. `faultVar` true **overrides**
+  the value colors with `faultColor` (`faultBlink` blinks between `faultColor` and
+  `faultBlinkColor`).
+- **Always emit 20 button objects and 2 dial objects per keypad regardless of
+  `model`**; leave unused ones `enabled:false`.
+- The 4 keypad **analog** vars (`base+22..+25`) are read-only hardware inputs (rotary/
+  analog); there is no analog config object — just reference the var if needed.
+- `id` is the keypad's CANopen node id — match the hardware (it does not affect the
+  var-map). Enable `timeoutEnabled`/`timeout` so a lost keypad fails its button vars to
+  0 (like canInputs). Set unused `valVars` slots to 0 (AlwaysFalse).
+- Example — button 1 toggles Output 1, LED green while the load is on:
+  `keypads[0].buttons[0].mode`=1 (Latching), `outputs[0].input`=165 (Keypad1Button1),
+  `keypads[0].buttons[0].valVars[0]`=87 (Out1Active), `…valColors[0]`=2 (Green).
+
+## Templates (complete default objects)
+
+The skill is self-contained: build a file by starting from these objects, which carry
+**every field at its firmware default**. Repeat each per array slot, setting `number`
+(and button/dial `keypadNumber`) to the 1-based position and `name` to anything; change
+only the fields you need — the rest stay at these defaults. Omitting a field is also
+legal for `apply` (it then takes the firmware default), but keep objects complete for a
+file you'll open in the GUI.
+
+**Required keys / smallest file:** for `apply`, only `PdmDevices` with a device that has
+a `baseId` is strictly needed — the smallest valid file is
+`{"PdmDevices":[{"baseId":222}],"CanboardDevices":[],"DbcDevices":[],"BlinkMarineKeypads":[],"GrayhillKeypads":[]}`
+and every unspecified parameter resets to its firmware default. Include all five
+top-level keys and complete objects when the file will also be opened in the GUI.
+
+File skeleton (full PDM — 2 inputs, 8 outputs, 32 canInputs, 32 canOutputs, 16
+virtualInputs, 4 flashers, 4 counters, 32 conditions, 2 keypads):
+
+```json
+{
+  "PdmDevices": [{
+    "pdmType": 0, "name": "myPdm", "baseId": 222,
+    "sleepEnabled": false, "filtersEnabled": false, "connectUsbToCan": true, "bitrate": 1,
+    "inputs": [ /* input × 2 */ ],
+    "outputs": [ /* output × 8 */ ],
+    "canInputs": [ /* canInput × 32 */ ],
+    "canOutputs": [ /* canOutput × 32 */ ],
+    "virtualInputs": [ /* virtualInput × 16 */ ],
+    "wipers": { /* wiper */ },
+    "flashers": [ /* flasher × 4 */ ],
+    "starterDisable": { /* starterDisable */ },
+    "counters": [ /* counter × 4 */ ],
+    "conditions": [ /* condition × 32 */ ],
+    "keypads": [ /* keypad × 2 */ ]
+  }],
+  "CanboardDevices": [], "DbcDevices": [], "BlinkMarineKeypads": [], "GrayhillKeypads": []
+}
+```
+
+Default objects (copy + set `number`/`name`):
+
+```json
+output      {"enabled":false,"name":"output1","number":1,"currentLimit":20,"resetCountLimit":3,"resetMode":0,"resetTime":1000,"inrushCurrentLimit":50,"inrushTime":1000,"input":0,"pwmEnabled":false,"softStartEnabled":false,"variableDutyCycle":false,"dutyCycleInput":0,"fixedDutyCycle":100,"frequency":100,"softStartRampTime":0,"dutyCycleDenominator":100,"minDutyCycle":0,"primaryOutput":-1}
+
+input       {"enabled":false,"name":"digitalInput1","number":1,"invert":false,"mode":0,"debounceTime":20,"pull":0}
+
+canInput    {"name":"canInput1","number":1,"enabled":false,"timeoutEnabled":false,"timeout":1000,"ide":false,"startBit":0,"bitLength":8,"factor":1,"offset":0,"byteOrder":0,"signed":false,"operator":0,"operand":0,"mode":0,"id":0}
+
+canOutput   {"name":"canOutput1","number":1,"enabled":false,"input":0,"ide":false,"startBit":0,"bitLength":8,"factor":1,"offset":0,"byteOrder":0,"signed":false,"interval":1000,"id":0}
+
+virtualInput {"name":"virtualInput1","number":1,"enabled":false,"not0":false,"var0":0,"cond0":0,"not1":false,"var1":0,"cond1":0,"not2":false,"var2":0,"mode":0}
+
+condition   {"name":"condition1","number":1,"enabled":false,"input":0,"operator":0,"arg":0}
+
+counter     {"name":"counter1","number":1,"enabled":false,"incInput":0,"decInput":0,"resetInput":0,"minCount":0,"maxCount":10,"incEdge":0,"decEdge":0,"resetEdge":0,"wrapAround":false,"holdToReset":false,"resetTime":2000}
+
+flasher     {"name":"flasher1","number":1,"enabled":false,"single":false,"input":0,"onTime":500,"offTime":500}
+
+wipers      {"name":"wiper","enabled":false,"mode":0,"slowInput":0,"fastInput":0,"interInput":0,"onInput":0,"speedInput":0,"parkInput":0,"parkStopLevel":false,"swipeInput":0,"washInput":0,"washWipeCycles":3,"speedMap":[3,4,5,6,7,8,1,2],"intermitTime":[1000,2000,3000,4000,5000,6000]}
+
+starterDisable {"name":"starterDisable","enabled":false,"input":0,"outputsDisabled":[false,false,false,false,false,false,false,false]}
+
+keypad      {"name":"keypad1","number":1,"enabled":false,"id":0,"timeoutEnabled":false,"timeout":0,"model":6,"backlightBrightness":63,"dimBacklightBrightness":32,"backlightButtonColor":0,"dimmingVar":0,"buttonBrightness":63,"dimButtonBrightness":32,"buttons":[ /* button × 20 */ ],"dials":[ /* dial × 2 */ ]}
+
+button      {"name":"button1","keypadNumber":1,"number":1,"enabled":false,"mode":0,"valColors":[0,0,0,0],"faultColor":0,"valVars":[0,0,0,0],"faultVar":0,"valBlink":[false,false,false,false],"faultBlink":false,"blinkColors":[0,0,0,0],"faultBlinkColor":0}
+
+dial        {"name":"dial1","keypadNumber":1,"number":1,"enabled":false,"minCount":0,"maxCount":16,"ledOffset":0}
+```
 
 ## Sleep / wake (when `sleepEnabled` is true)
 
@@ -261,6 +454,19 @@ to satisfy DLC ≥ 4:
 "interval": 100, ... }` and a second canOutput `{ "enabled": true, "input": 0,
 "id": 1603, "startBit": 24, "bitLength": 1, "interval": 100, ... }` (0x643 = 1603;
 the pad at byte 3 forces DLC 4).
+
+## Glossary / behavior notes
+
+- `State` (var 2) = DeviceState: Run=0, Sleep=1, OverTemp=2, Error=3.
+- `connectUsbToCan` false = the device does NOT bridge USB traffic onto CAN (or vice
+  versa); keep it true unless you deliberately want to isolate USB from the bus.
+- output `primaryOutput` (int8): -1 = standalone. Set it to another output's **0-based**
+  index to **gang** this output to that one (e.g. to follow Output 1, set `0`) — the
+  follower mirrors the primary's on/off and its current sums into the primary; the
+  follower's own `input` is ignored.
+- counter `holdToReset`: when true, the counter resets only after `resetInput` is held
+  for `resetTime` ms, instead of on a single reset edge.
+- WiperMode: DigIn=0 (discrete speed inputs), IntIn=1 (intermittent dial), MixIn=2 (both).
 
 ## Worked example — reversible window lift
 
