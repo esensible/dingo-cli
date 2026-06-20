@@ -23,9 +23,9 @@ Upstream projects:
 - dingoConfig GUI (file format owner): https://github.com/corygrant/dingoConfig
 
 This skill is everything needed to **hand-write or edit** that JSON correctly. To
-**apply** a file to a device, use the `dingo` CLI (`dingo apply <file.json> -port
-<port> [-base <id>] [-burn]`); run `dingo -h` / `dingo <cmd> -h` for its full
-surface. The CLI only reads the file (never rewrites it), selects the PDM whose
+**apply** a file to a device, use the `dingo` CLI:
+`dingo apply [-port <port>] [-base <id>] [-burn] <file.json>` — flags and the file
+may be given in any order. Run `dingo -h` / `dingo <cmd> -h` for the full surface. The CLI only reads the file (never rewrites it), selects the PDM whose
 `baseId` matches `-base`, and verifies the device's parameter count + CRC, so a
 successful `apply` means the device holds exactly the file.
 
@@ -93,7 +93,7 @@ matching `-base`.
 | `sleepEnabled` | bool | enable low-power sleep (see Sleep/wake). |
 | `filtersEnabled` | bool | enable the CAN acceptance filter. |
 | `connectUsbToCan` | bool | bridge USB<->CAN (keep true for normal use). |
-| `bitrate` | enum CanBitrate | CAN speed. |
+| `bitrate` | enum CanBitrate | CAN speed. All bus nodes (PDM, CANBoards, keypads) must match. |
 
 Then these arrays/objects (full-PDM counts):
 
@@ -114,7 +114,7 @@ referenced variable is non-zero/true.
 |---|---|---|
 | 0 | AlwaysFalse | constant 0 |
 | 1 | AlwaysTrue | constant 1 |
-| 2 | State | device state |
+| 2 | State | DeviceState, **numeric**: Run=0, Sleep=1, OverTemp=2, Error=3 (isolate one state via a condition — see conditions) |
 | 3 | BoardTemp | board temperature |
 | 4 | BattVolt | battery voltage |
 | 5 | DigIn1 | PDM digital input 1 |
@@ -198,6 +198,13 @@ relays → `Count`, or `None` to hard-latch on fault. If a scenario doesn't spec
 Inrush: for `inrushTime` ms after turn-on, the limit is `inrushCurrentLimit`; after
 that, `currentLimit`. Set inrush ≥ motor/lamp surge and `inrushTime` long enough to
 cover startup but short enough to still protect a stalled load.
+**Match limits to the physical channel:** on a standard dingoPDM, Outputs 1–2 are
+13 A pins and Outputs 3–8 are 8 A pins (see the `dingopdm-hardware` skill). Set the
+**continuous `currentLimit` at or below the channel rating**. `inrushCurrentLimit`
+*may* exceed the channel rating to pass a brief motor/lamp surge, as long as it is
+bounded by a short `inrushTime` — e.g. the window-lift example below allows 80 A for
+800 ms on a 13 A channel. Don't leave the template default (`inrushCurrentLimit` 50)
+on a load that can't actually tolerate that surge.
 
 **Gating / overriding an output:** an output has exactly one driver (`input`) and no
 separate inhibit/disable field (the only built-in force-off is `starterDisable`, and
@@ -213,7 +220,8 @@ wiring (switch-to-ground + `pull`=Up needs `invert`=true so closed→true). For 
 **momentary push-button that toggles** an output on/off (each press flips it):
 `mode`=Latching — `DigIn{n}` then flips on each press (starts false at boot), and you
 drive the output directly from it. Latching behaves the same on `inputs`,
-`canInputs`, and `virtualInputs`.
+`canInputs`, and `virtualInputs`. Set `enabled: true` on any input you reference —
+a disabled input is not scanned, so treat its `DigIn{n}` as unavailable (0).
 
 ### canInputs[] (decode a CAN signal, 32)
 `enabled` · `timeoutEnabled` bool · `timeout` ms · `ide` bool (extended id) ·
@@ -248,7 +256,7 @@ drive the output directly from it. Latching behaves the same on `inputs`,
   `startBit` = `8*byte + bit`). To send a boolean state into a byte, use
   `bitLength`=1 at `startBit` = `8*byte`.
 - **Multiple canOutputs with the same `id` are merged into one frame.** The frame's
-  DLC is auto-sized to the highest byte any of them writes. Use a second canOutput on
+  DLC is auto-sized to the highest byte any of them writes (writing any bit in byte N forces DLC = N+1; entries sharing an `id` should share one `interval`). Use a second canOutput on
   the same id at a higher `startBit` to pad the DLC if a receiver requires a minimum
   length.
 
@@ -269,7 +277,10 @@ output's `input` at this `VirtIn{n}`.
 ### conditions[] (compare a value, 32)
 `enabled` · `input` var ref · `operator` Operator · `arg` float (in the `input` var's
 units). Exposes `Cond{n}` = `value(input) <operator> arg`. E.g. low-voltage:
-input=BattVolt(4), operator=LessThan(3), arg=11.5.
+input=BattVolt(4), operator=LessThan(3), arg=11.5. To act only in a specific
+device state — e.g. over-temperature: input=State(2), operator=Equal(0), arg=2 →
+`Cond{n}` is true only when State==OverTemp. (Wiring `State` straight into a
+boolean input would be true in Sleep and Error too, since both are non-zero.)
 
 ### counters[] (4)
 `enabled` · `incInput` `decInput` `resetInput` var refs · `minCount` `maxCount` 0..255 ·
@@ -443,17 +454,22 @@ file. The PDM reads its inputs and commands its outputs via CAN in/out entries:
   bit0 = DO1, byte1 bit0 = DO2, byte2 bit0 = DO3, byte3 bit0 = DO4 (0x01 = on).
 
 To **read CANBoard DI{n}** on the PDM — a canInput:
-`{ "enabled": true, "id": 1602, "startBit": 32+(n-1), "bitLength": 1, "operator": 0,
+`{ "enabled": true, "ide": false, "id": 1602, "startBit": 32+(n-1), "bitLength": 1, "operator": 0,
 "operand": 1, "byteOrder": 0, "factor": 1, "offset": 0, "timeoutEnabled": true,
 "timeout": 500, "mode": 0, ... }` (0x642 = 1602; byte 4 bit0 is absolute bit 32, so
 DI1→32, DI2→33). Use that slot's `CanIn{slot}Out` variable in logic.
 
 To **command CANBoard DO{n}** from the PDM — a canOutput driving the bit, plus a pad
 to satisfy DLC ≥ 4:
-`{ "enabled": true, "input": <var>, "id": 1603, "startBit": (n-1)*8, "bitLength": 1,
+`{ "enabled": true, "ide": false, "input": <var>, "id": 1603, "startBit": (n-1)*8, "bitLength": 1,
 "interval": 100, ... }` and a second canOutput `{ "enabled": true, "input": 0,
 "id": 1603, "startBit": 24, "bitLength": 1, "interval": 100, ... }` (0x643 = 1603;
-the pad at byte 3 forces DLC 4).
+the pad at byte 3 forces DLC 4). Commanding DO4 alone (byte 3) already yields DLC 4,
+so a pad is only needed when the highest output you write sits below byte 3.
+
+The CANBoard's analog inputs (AI1–AI5) are also broadcast, but their exact byte
+positions and scaling are **not documented here** — read them from the firmware DBC
+(`dingoFW/dbc`) or `dingoFW` source before relying on them; don't guess.
 
 ## Glossary / behavior notes
 
@@ -466,7 +482,9 @@ the pad at byte 3 forces DLC 4).
   follower's own `input` is ignored.
 - counter `holdToReset`: when true, the counter resets only after `resetInput` is held
   for `resetTime` ms, instead of on a single reset edge.
-- WiperMode: DigIn=0 (discrete speed inputs), IntIn=1 (intermittent dial), MixIn=2 (both).
+- WiperMode: DigIn=0 (discrete speed inputs), IntIn=1 (numeric speed selector —
+  `speedInput` indexes `speedMap`; handles all speeds, not just intermittent),
+  MixIn=2 (both).
 
 ## Worked example — reversible window lift
 

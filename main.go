@@ -121,6 +121,24 @@ func (c *conn) withPort(fn func(*slcan.Port) error) error {
 	return fn(p)
 }
 
+// parseArgs parses fs but, unlike a bare fs.Parse, tolerates positional
+// arguments appearing before, after, or between flags (Go's flag package
+// otherwise stops at the first non-flag token). It returns the positionals in
+// order. This lets "apply file.json -port X" and "apply -port X file.json" both
+// work, matching how the docs and `-h` present the command.
+func parseArgs(fs *flag.FlagSet, args []string) []string {
+	var positionals []string
+	for {
+		fs.Parse(args)
+		args = fs.Args()
+		if len(args) == 0 {
+			return positionals
+		}
+		positionals = append(positionals, args[0])
+		args = args[1:]
+	}
+}
+
 // maybeBurn persists to flash when -burn was given.
 func maybeBurn(cl *dingo.Client, burn bool) error {
 	if !burn {
@@ -137,8 +155,7 @@ func runApply(args []string) error {
 	fs := flag.NewFlagSet("apply", flag.ExitOnError)
 	c := addConn(fs)
 	burn := fs.Bool("burn", false, "burn to flash after a successful apply")
-	fs.Parse(args)
-	rest := fs.Args()
+	rest := parseArgs(fs, args)
 	if len(rest) != 1 {
 		return errors.New("apply requires exactly one dingoConfig .json file argument")
 	}
@@ -163,8 +180,7 @@ func runSet(args []string) error {
 	fs := flag.NewFlagSet("set", flag.ExitOnError)
 	c := addConn(fs)
 	burn := fs.Bool("burn", false, "burn to flash after a successful set")
-	fs.Parse(args)
-	rest := fs.Args()
+	rest := parseArgs(fs, args)
 	if len(rest) != 2 {
 		return errors.New("set requires <name> <value>")
 	}
