@@ -1,0 +1,62 @@
+{
+  "name": "lights: indicators, hazard hold-gesture, high-beam flick-toggle",
+  "_notes": [
+    "Stimulus for lights-repin.json (baseId 222).",
+    "CAN 0x642 byte 4 = CANBoard digital inputs: bit33=DI2 blink-left,",
+    "bit34=DI3 blink-right, bit35=DI4 park, bit36=DI5 low, bit37=DI6 high,",
+    "bit38=DI7 flick. CAN 0x301 bit0 = engine running, bit1 = heater request",
+    "(both broadcast by the engine PDM).",
+    "Pins: 1=REV_REQ, 2=BRAKE_REQ, both pull-up + invert (pin 0 = pressed).",
+    "Outputs: 1 brake, 2 heater-fan, 3 park, 4 left-ind, 5 low-beam,",
+    "6 right-ind, 7 high-beam, 8 reverse.",
+    "Hazard gesture: hold high-stalk with flick NOT pressed; a 50/50 ms",
+    "flasher ticks a counter to 3 (~100-200 ms) to arm HAZARD_ON.",
+    "High beam: low + high + flick toggles a wrapAround counter."
+  ],
+  "steps": [
+    {"label": "power-on idle", "ms": 400,
+     "pins": {"1": 1, "2": 1},
+     "bits": {"0x642:33": 0, "0x642:34": 0, "0x642:35": 0, "0x642:36": 0,
+              "0x642:37": 0, "0x642:38": 0, "0x301:0": 0, "0x301:1": 0}},
+
+    {"label": "engine starts", "ms": 200, "bits": {"0x301:0": 1}},
+
+    {"label": "brake on", "ms": 250, "pins": {"2": 0}},
+    {"label": "brake off", "ms": 250, "pins": {"2": 1}},
+    {"label": "reverse selected", "ms": 250, "pins": {"1": 0}},
+    {"label": "reverse out", "ms": 250, "pins": {"1": 1}},
+
+    {"label": "park lamps on", "ms": 300, "bits": {"0x642:35": 1}},
+    {"label": "low beam on", "ms": 300, "bits": {"0x642:36": 1}},
+
+    {"label": "indicate left", "ms": 1600, "bits": {"0x642:33": 1}},
+    {"label": "cancel left", "ms": 200, "bits": {"0x642:33": 0}},
+    {"label": "indicate right", "ms": 1600, "bits": {"0x642:34": 1}},
+    {"label": "cancel right", "ms": 200, "bits": {"0x642:34": 0}},
+
+    {"label": "flick alone (high stalk off)", "ms": 200, "bits": {"0x642:38": 1}},
+    {"label": "release flick", "ms": 200, "bits": {"0x642:38": 0}},
+
+    {"label": "high stalk + flick -> toggle high beam ON", "ms": 60,
+     "bits": {"0x642:37": 1, "0x642:38": 1}},
+    {"label": "release flick, keep stalk", "ms": 60, "bits": {"0x642:38": 0}},
+    {"label": "drop stalk before hazard arms", "ms": 400, "bits": {"0x642:37": 0}},
+
+    {"label": "high stalk + flick -> toggle high beam OFF", "ms": 60,
+     "bits": {"0x642:37": 1, "0x642:38": 1}},
+    {"label": "release flick and stalk", "ms": 400,
+     "bits": {"0x642:37": 0, "0x642:38": 0}},
+
+    {"label": "HOLD high stalk -> hazard arms", "ms": 1600, "bits": {"0x642:37": 1}},
+    {"label": "still holding, hazards flashing", "ms": 1600},
+    {"label": "release stalk -> hazards stop", "ms": 800, "bits": {"0x642:37": 0}},
+
+    {"label": "low beam off -> high beam force-off", "ms": 400, "bits": {"0x642:36": 0}},
+    {"label": "park off", "ms": 300, "bits": {"0x642:35": 0}},
+    {"label": "heater request from engine", "ms": 300, "bits": {"0x301:1": 1}},
+    {"label": "heater request clears", "ms": 300, "bits": {"0x301:1": 0}},
+    {"label": "engine stops -> reverse inhibited", "ms": 300, "bits": {"0x301:0": 0}},
+    {"label": "reverse with engine off", "ms": 300, "pins": {"1": 0}},
+    {"label": "release reverse", "ms": 300, "pins": {"1": 1}}
+  ]
+}

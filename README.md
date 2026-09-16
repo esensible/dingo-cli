@@ -116,13 +116,23 @@ tests with `go test ./...`.
 - `internal/dingo` — the parameter protocol over SLCAN (`WriteAll`/`SetParam`/
   `Burn`/`Version`/…), behind a `Transport` interface for hardware-free tests.
 - `internal/slcan` — the SLCAN transport over USB CDC.
+- `fwmodel/` — **Python, not part of the Go build.** A behavioural model of the
+  firmware's `CyclicUpdate()` that answers "I changed this config, does it still
+  behave the same?" without hardware, by simulating two configs against a
+  stimulus trace cycle by cycle. See `fwmodel/README.md`.
 
 ## Notes
 
 - `apply`/`set` change the **live** config; add `-burn` (or run `dingo burn`) to
   persist to flash.
-- The board targeted here is **dingopdm_v7** (8 outputs, 2 keypads, …); the param
-  table in `internal/params` is board-specific.
+- `internal/params` is board-parameterised: `NewRegistry(board)` builds the exact
+  parameter set and var-map layout for dingoPDM, dingoPDM-Max, PT-DPDM or
+  CANBoard, and `apply` picks the board from the document's `pdmType`. The
+  package-level helpers (`Lookup`, `Encode`, …) still resolve against
+  **dingopdm_v7**, which is what `dingo set`/`getn` address. This matters because
+  the var map is *not* portable: `VirtIn1` is 71 on dingopdm_v7 but 79 on
+  pt-dpdm4_1 and 51 on canboard_v2, and v7 and Max agree on `VirtIn1` while
+  diverging at `Cond1` (123 against 107).
 - Older firmware (pre-SLCAN-RX) uses a raw-byte USB protocol and a different
   bootloader command; `dingo raw` exists to drive that recovery path. Current
   firmware uses `dingo bootloader`.

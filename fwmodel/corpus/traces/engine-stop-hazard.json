@@ -1,0 +1,25 @@
+{
+  "name": "engine: washing the screen while braking stops the engine",
+  "_notes": [
+    "A real behavioural hazard in engine-repin.json, not a compiler bug: the",
+    "stop gesture is CHORD = brake AND washer, and there is no guard against",
+    "the driver pressing the washer while on the brake. VI5 WASHER_PUMP even",
+    "encodes the author's awareness of the overlap (washer AND NOT brake), but",
+    "CHORD (VI1) has no such exclusion, so the run-latch still decrements.",
+    "Keep this trace: any compiled equivalent MUST reproduce it. A compiler",
+    "that 'helpfully' adds the guard has changed the program."
+  ],
+  "steps": [
+    {"label": "idle", "ms": 300, "pins": {"1": 1, "2": 1},
+     "bits": {"0x642:32": 0, "0x642:39": 0, "0x300:0": 0}},
+    {"label": "brake + washer", "ms": 100, "bits": {"0x300:0": 1, "0x642:32": 1}},
+    {"label": "+ horn: crank", "ms": 600, "bits": {"0x642:39": 1}},
+    {"label": "release horn", "ms": 200, "bits": {"0x642:39": 0}},
+    {"label": "release chord: engine runs", "ms": 800,
+     "bits": {"0x300:0": 0, "0x642:32": 0}},
+    {"label": "driver brakes", "ms": 400, "bits": {"0x300:0": 1}},
+    {"label": "driver washes screen while braking", "ms": 600, "bits": {"0x642:32": 1}},
+    {"label": "release both -- engine has stopped", "ms": 800,
+     "bits": {"0x300:0": 0, "0x642:32": 0}}
+  ]
+}

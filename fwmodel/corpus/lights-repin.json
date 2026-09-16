@@ -1,0 +1,68 @@
+{
+  "PdmDevices": [
+    {
+      "pdmType": 0,
+      "name": "lights-repin",
+      "baseId": 222,
+      "sleepEnabled": false,
+      "filtersEnabled": false,
+      "connectUsbToCan": true,
+      "bitrate": 1,
+      "inputs": [
+        {"name": "REV_REQ"  , "number": 1, "enabled": true, "mode": 0, "pull": 1, "invert": true, "debounceTime": 20},
+        {"name": "BRAKE_REQ", "number": 2, "enabled": true, "mode": 0, "pull": 1, "invert": true, "debounceTime": 20}
+      ],
+      "outputs": [
+        {"name": "brake"     , "number": 1, "enabled": true, "input": 6 , "currentLimit": 10, "inrushCurrentLimit": 20, "inrushTime": 300, "resetMode": 1, "resetCountLimit": 5, "resetTime": 1000},
+        {"name": "heater-fan", "number": 2, "enabled": true, "input": 21, "currentLimit": 13, "inrushCurrentLimit": 50, "inrushTime": 300, "resetMode": 1, "resetCountLimit": 5, "resetTime": 1000},
+        {"name": "park"      , "number": 3, "enabled": true, "input": 11, "currentLimit": 3 , "inrushCurrentLimit": 10, "inrushTime": 300, "resetMode": 1, "resetCountLimit": 5, "resetTime": 1000},
+        {"name": "left-ind"  , "number": 4, "enabled": true, "input": 75, "currentLimit": 5 , "inrushCurrentLimit": 10, "inrushTime": 300, "resetMode": 1, "resetCountLimit": 5, "resetTime": 1000},
+        {"name": "low-beam"  , "number": 5, "enabled": true, "input": 13, "currentLimit": 8 , "inrushCurrentLimit": 12, "inrushTime": 300, "resetMode": 1, "resetCountLimit": 5, "resetTime": 1000},
+        {"name": "right-ind" , "number": 6, "enabled": true, "input": 76, "currentLimit": 5 , "inrushCurrentLimit": 10, "inrushTime": 300, "resetMode": 1, "resetCountLimit": 5, "resetTime": 1000},
+        {"name": "high-beam" , "number": 7, "enabled": true, "input": 71, "currentLimit": 8 , "inrushCurrentLimit": 12, "inrushTime": 300, "resetMode": 1, "resetCountLimit": 5, "resetTime": 1000},
+        {"name": "reverse"   , "number": 8, "enabled": true, "input": 77, "currentLimit": 5 , "inrushCurrentLimit": 10, "inrushTime": 300, "resetMode": 1, "resetCountLimit": 5, "resetTime": 1000}
+      ],
+      "canInputs": [
+        {"name": "blink-left(DI2)"   , "number": 1, "enabled": true, "id": 1602, "startBit": 33, "ide": false, "bitLength": 1, "byteOrder": 0, "signed": false, "factor": 1, "offset": 0, "operator": 0, "operand": 1, "mode": 0, "timeoutEnabled": true, "timeout": 500},
+        {"name": "blink-right(DI3)"  , "number": 2, "enabled": true, "id": 1602, "startBit": 34, "ide": false, "bitLength": 1, "byteOrder": 0, "signed": false, "factor": 1, "offset": 0, "operator": 0, "operand": 1, "mode": 0, "timeoutEnabled": true, "timeout": 500},
+        {"name": "park(DI4)"         , "number": 3, "enabled": true, "id": 1602, "startBit": 35, "ide": false, "bitLength": 1, "byteOrder": 0, "signed": false, "factor": 1, "offset": 0, "operator": 0, "operand": 1, "mode": 0, "timeoutEnabled": true, "timeout": 500},
+        {"name": "low(DI5)"          , "number": 4, "enabled": true, "id": 1602, "startBit": 36, "ide": false, "bitLength": 1, "byteOrder": 0, "signed": false, "factor": 1, "offset": 0, "operator": 0, "operand": 1, "mode": 0, "timeoutEnabled": true, "timeout": 500},
+        {"name": "high(DI6)"         , "number": 5, "enabled": true, "id": 1602, "startBit": 37, "ide": false, "bitLength": 1, "byteOrder": 0, "signed": false, "factor": 1, "offset": 0, "operator": 0, "operand": 1, "mode": 0, "timeoutEnabled": true, "timeout": 500},
+        {"name": "flick(DI7)"        , "number": 6, "enabled": true, "id": 1602, "startBit": 38, "ide": false, "bitLength": 1, "byteOrder": 0, "signed": false, "factor": 1, "offset": 0, "operator": 0, "operand": 1, "mode": 0, "timeoutEnabled": true, "timeout": 500},
+        {"name": "running(engine)"   , "number": 7, "enabled": true, "id": 769 , "startBit": 0 , "ide": false, "bitLength": 1, "byteOrder": 0, "signed": false, "factor": 1, "offset": 0, "operator": 0, "operand": 1, "mode": 0, "timeoutEnabled": true, "timeout": 500},
+        {"name": "heater-req(engine)", "number": 8, "enabled": true, "id": 769 , "startBit": 1 , "ide": false, "bitLength": 1, "byteOrder": 0, "signed": false, "factor": 1, "offset": 0, "operator": 0, "operand": 1, "mode": 0, "timeoutEnabled": true, "timeout": 500}
+      ],
+      "canOutputs": [
+        {"name": "BRAKE_REQ", "number": 1, "enabled": true, "input": 6, "id": 768, "startBit": 0, "ide": false, "bitLength": 1, "byteOrder": 0, "signed": false, "factor": 1, "offset": 0, "interval": 100}
+      ],
+      "virtualInputs": [
+        {"name": "HIGH_BEAM_OUT"  , "number": 1, "enabled": true, "not0": false, "var0": 124, "cond0": 0, "not1": false, "var1": 13 , "cond1": 1, "not2": false, "var2": 0  , "mode": 0},
+        {"name": "HAZARD"         , "number": 2, "enabled": true, "not0": false, "var0": 15 , "cond0": 0, "not1": true , "var1": 17 , "cond1": 1, "not2": false, "var2": 0  , "mode": 0},
+        {"name": "LEFT_REQ"       , "number": 3, "enabled": true, "not0": false, "var0": 7  , "cond0": 1, "not1": false, "var1": 0  , "cond1": 1, "not2": false, "var2": 0  , "mode": 0},
+        {"name": "RIGHT_REQ"      , "number": 4, "enabled": true, "not0": false, "var0": 9  , "cond0": 1, "not1": false, "var1": 0  , "cond1": 1, "not2": false, "var2": 0  , "mode": 0},
+        {"name": "LEFT_OUT"       , "number": 5, "enabled": true, "not0": false, "var0": 119, "cond0": 0, "not1": true , "var1": 123, "cond1": 1, "not2": false, "var2": 122, "mode": 0},
+        {"name": "RIGHT_OUT"      , "number": 6, "enabled": true, "not0": false, "var0": 120, "cond0": 0, "not1": true , "var1": 123, "cond1": 1, "not2": false, "var2": 122, "mode": 0},
+        {"name": "REVERSE_OUT"    , "number": 7, "enabled": true, "not0": false, "var0": 5  , "cond0": 0, "not1": false, "var1": 19 , "cond1": 1, "not2": false, "var2": 0  , "mode": 0},
+        {"name": "HIGH_BEAM_PRESS", "number": 8, "enabled": true, "not0": false, "var0": 15 , "cond0": 0, "not1": false, "var1": 13 , "cond1": 0, "not2": false, "var2": 17 , "mode": 0}
+      ],
+      "flashers": [
+        {"name": "left-flash"  , "number": 1, "enabled": true, "input": 73 , "single": false, "onTime": 350, "offTime": 350},
+        {"name": "right-flash" , "number": 2, "enabled": true, "input": 74 , "single": false, "onTime": 350, "offTime": 350},
+        {"name": "hazard-tick" , "number": 3, "enabled": true, "input": 72 , "single": false, "onTime": 50 , "offTime": 50},
+        {"name": "hazard-flash", "number": 4, "enabled": true, "input": 123, "single": false, "onTime": 350, "offTime": 350}
+      ],
+      "conditions": [
+        {"name": "HAZARD_ON"   , "number": 1, "enabled": true, "input": 155, "operator": 4, "arg": 3},
+        {"name": "HIGH_BEAM_ON", "number": 2, "enabled": true, "input": 156, "operator": 4, "arg": 1}
+      ],
+      "counters": [
+        {"name": "hazard-debounce", "number": 1, "enabled": true, "incInput": 121, "incEdge": 0, "decInput": 0, "decEdge": 0, "resetInput": 72, "resetEdge": 1, "minCount": 0, "maxCount": 5, "wrapAround": false, "holdToReset": false, "resetTime": 0},
+        {"name": "high-beam-latch", "number": 2, "enabled": true, "incInput": 78 , "incEdge": 0, "decInput": 0, "decEdge": 0, "resetInput": 13, "resetEdge": 1, "minCount": 0, "maxCount": 1, "wrapAround": true , "holdToReset": false, "resetTime": 0}
+      ]
+    }
+  ],
+  "CanboardDevices": [],
+  "DbcDevices": [],
+  "BlinkMarineKeypads": [],
+  "GrayhillKeypads": []
+}

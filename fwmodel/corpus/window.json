@@ -1,0 +1,96 @@
+{
+  "PdmDevices": [
+    {
+      "name": "Window",
+      "baseId": 2000,
+      "canInputs": [
+        {
+          "name": "SwitchUp",
+          "number": 1,
+          "enabled": true,
+          "timeoutEnabled": false,
+          "timeout": 0,
+          "ide": false,
+          "startingByte": 0,
+          "dlc": 8,
+          "operator": 6,
+          "onVal": 1,
+          "mode": 0,
+          "id": 1402
+        },
+        {
+          "name": "SwitchDown",
+          "number": 2,
+          "enabled": true,
+          "timeoutEnabled": false,
+          "timeout": 0,
+          "ide": false,
+          "startingByte": 0,
+          "dlc": 8,
+          "operator": 6,
+          "onVal": 2,
+          "mode": 0,
+          "id": 1402
+        }
+      ],
+      "virtualInputs": [
+        {
+          "name": "UpOrDown",
+          "number": 1,
+          "enabled": true,
+          "not0": false,
+          "var0": 3,
+          "cond0": 1,
+          "not1": false,
+          "var1": 4,
+          "cond1": 0,
+          "not2": false,
+          "var2": 0,
+          "mode": 0
+        }
+      ],
+      "outputs": [
+        {
+          "enabled": true,
+          "name": "Power",
+          "number": 1,
+          "currentLimit": 15,
+          "resetCountLimit": 1,
+          "resetMode": 1,
+          "resetTime": 10,
+          "inrushCurrentLimit": 0,
+          "inrushTime": 0,
+          "input": 67,
+          "pwmEnabled": false,
+          "softStartEnabled": false,
+          "variableDutyCycle": false,
+          "dutyCycleInput": 0,
+          "fixedDutyCycle": 0,
+          "frequency": 0,
+          "softStartRampTime": 0,
+          "dutyCycleDenominator": 0
+        },
+        {
+          "enabled": true,
+          "name": "Direction",
+          "number": 2,
+          "currentLimit": 5,
+          "resetCountLimit": 0,
+          "resetMode": 2,
+          "resetTime": 1,
+          "inrushCurrentLimit": 0,
+          "inrushTime": 0,
+          "input": 4,
+          "pwmEnabled": false,
+          "softStartEnabled": false,
+          "variableDutyCycle": false,
+          "dutyCycleInput": 0,
+          "fixedDutyCycle": 0,
+          "frequency": 0,
+          "softStartRampTime": 0,
+          "dutyCycleDenominator": 0
+        }
+      ]
+    }
+  ]
+}

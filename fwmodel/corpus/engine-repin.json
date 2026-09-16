@@ -1,0 +1,63 @@
+{
+  "PdmDevices": [
+    {
+      "pdmType": 0,
+      "name": "engine-repin",
+      "baseId": 512,
+      "sleepEnabled": false,
+      "filtersEnabled": false,
+      "connectUsbToCan": true,
+      "bitrate": 1,
+      "inputs": [
+        {"name": "HEATER_SW", "number": 1, "enabled": true, "mode": 0, "pull": 1, "invert": true, "debounceTime": 20},
+        {"name": "PARK_BRAKE_REQ", "number": 2, "enabled": true, "mode": 0, "pull": 1, "invert": true, "debounceTime": 20}
+      ],
+      "outputs": [
+        {"name": "starter-solenoid", "number": 1, "enabled": true, "input": 72, "currentLimit": 13, "inrushCurrentLimit": 40, "inrushTime": 500, "resetMode": 1, "resetCountLimit": 5, "resetTime": 1000},
+        {"name": "coil-ballast-run", "number": 2, "enabled": true, "input": 74, "currentLimit": 10, "inrushCurrentLimit": 20, "inrushTime": 300, "resetMode": 1, "resetCountLimit": 5, "resetTime": 1000},
+        {"name": "washer-pump", "number": 3, "enabled": true, "input": 75, "currentLimit": 8, "inrushCurrentLimit": 15, "inrushTime": 300, "resetMode": 1, "resetCountLimit": 5, "resetTime": 1000},
+        {"name": "alt-field+ecu", "number": 4, "enabled": true, "input": 74, "currentLimit": 8, "inrushCurrentLimit": 15, "inrushTime": 300, "resetMode": 1, "resetCountLimit": 5, "resetTime": 1000},
+        {"name": "wiper", "number": 5, "enabled": true, "input": 123, "currentLimit": 8, "inrushCurrentLimit": 40, "inrushTime": 1000, "resetMode": 2, "resetCountLimit": 5, "resetTime": 500},
+        {"name": "coil-direct-start", "number": 6, "enabled": true, "input": 72, "currentLimit": 8, "inrushCurrentLimit": 15, "inrushTime": 300, "resetMode": 1, "resetCountLimit": 5, "resetTime": 1000},
+        {"name": "horn", "number": 7, "enabled": true, "input": 76, "currentLimit": 8, "inrushCurrentLimit": 12, "inrushTime": 300, "resetMode": 1, "resetCountLimit": 5, "resetTime": 1000},
+        {"name": "canbus-12v", "number": 8, "enabled": true, "input": 1, "currentLimit": 5, "inrushCurrentLimit": 8, "inrushTime": 300, "resetMode": 1, "resetCountLimit": 5, "resetTime": 1000}
+      ],
+      "canInputs": [
+        {"name": "washer(DI1)", "number": 1, "enabled": true, "id": 1602, "startBit": 32, "ide": false, "bitLength": 1, "byteOrder": 0, "signed": false, "factor": 1, "offset": 0, "operator": 0, "operand": 1, "mode": 0, "timeoutEnabled": true, "timeout": 500},
+        {"name": "horn(DI8)", "number": 2, "enabled": true, "id": 1602, "startBit": 39, "ide": false, "bitLength": 1, "byteOrder": 0, "signed": false, "factor": 1, "offset": 0, "operator": 0, "operand": 1, "mode": 0, "timeoutEnabled": true, "timeout": 500},
+        {"name": "brake(lights)", "number": 3, "enabled": true, "id": 768, "startBit": 0, "ide": false, "bitLength": 1, "byteOrder": 0, "signed": false, "factor": 1, "offset": 0, "operator": 0, "operand": 1, "mode": 0, "timeoutEnabled": true, "timeout": 500}
+      ],
+      "canOutputs": [
+        {"name": "ENGINE_RUNNING", "number": 1, "enabled": true, "input": 123, "id": 769, "startBit": 0, "ide": false, "bitLength": 1, "byteOrder": 0, "signed": false, "factor": 1, "offset": 0, "interval": 100},
+        {"name": "HEATER_REQ", "number": 2, "enabled": true, "input": 78, "id": 769, "startBit": 1, "ide": false, "bitLength": 1, "byteOrder": 0, "signed": false, "factor": 1, "offset": 0, "interval": 100},
+        {"name": "IC_PARK", "number": 3, "enabled": true, "input": 79, "id": 1603, "startBit": 8, "ide": false, "bitLength": 1, "byteOrder": 0, "signed": false, "factor": 1, "offset": 0, "interval": 100},
+        {"name": "dlc-pad", "number": 4, "enabled": true, "input": 0, "id": 1603, "startBit": 24, "ide": false, "bitLength": 1, "byteOrder": 0, "signed": false, "factor": 1, "offset": 0, "interval": 100}
+      ],
+      "virtualInputs": [
+        {"name": "CHORD", "number": 1, "enabled": true, "not0": false, "var0": 11, "cond0": 0, "not1": false, "var1": 7, "cond1": 1, "not2": false, "var2": 0, "mode": 0},
+        {"name": "START_REQ", "number": 2, "enabled": true, "not0": false, "var0": 71, "cond0": 0, "not1": false, "var1": 9, "cond1": 1, "not2": false, "var2": 0, "mode": 0},
+        {"name": "ARMED", "number": 3, "enabled": true, "not0": false, "var0": 71, "cond0": 0, "not1": false, "var1": 124, "cond1": 1, "not2": false, "var2": 0, "mode": 0},
+        {"name": "IGN", "number": 4, "enabled": true, "not0": false, "var0": 123, "cond0": 1, "not1": false, "var1": 72, "cond1": 1, "not2": false, "var2": 0, "mode": 0},
+        {"name": "WASHER_PUMP", "number": 5, "enabled": true, "not0": false, "var0": 7, "cond0": 0, "not1": true, "var1": 11, "cond1": 0, "not2": false, "var2": 123, "mode": 0},
+        {"name": "HORN_GATE", "number": 6, "enabled": true, "not0": false, "var0": 9, "cond0": 0, "not1": true, "var1": 71, "cond1": 1, "not2": false, "var2": 0, "mode": 0},
+        {"name": "HEATER_PRESS", "number": 7, "enabled": true, "not0": false, "var0": 5, "cond0": 0, "not1": false, "var1": 123, "cond1": 1, "not2": false, "var2": 0, "mode": 0},
+        {"name": "HEATER_REQ", "number": 8, "enabled": true, "not0": false, "var0": 125, "cond0": 0, "not1": false, "var1": 123, "cond1": 1, "not2": false, "var2": 0, "mode": 0},
+        {"name": "PARK_BRAKE_LAMP", "number": 9, "enabled": true, "not0": false, "var0": 6, "cond0": 0, "not1": false, "var1": 123, "cond1": 1, "not2": false, "var2": 0, "mode": 0}
+      ],
+      "counters": [
+        {"name": "run-latch", "number": 1, "enabled": true, "incInput": 73, "incEdge": 1, "decInput": 71, "decEdge": 0, "resetInput": 0, "resetEdge": 0, "minCount": 0, "maxCount": 1, "wrapAround": false, "holdToReset": false, "resetTime": 0},
+        {"name": "crank-latch", "number": 2, "enabled": true, "incInput": 72, "incEdge": 0, "decInput": 71, "decEdge": 1, "resetInput": 0, "resetEdge": 0, "minCount": 0, "maxCount": 1, "wrapAround": false, "holdToReset": false, "resetTime": 0},
+        {"name": "heater-latch", "number": 3, "enabled": true, "incInput": 77, "incEdge": 0, "decInput": 0, "decEdge": 0, "resetInput": 123, "resetEdge": 1, "minCount": 0, "maxCount": 1, "wrapAround": true, "holdToReset": false, "resetTime": 0}
+      ],
+      "conditions": [
+        {"name": "ENGINE_RUN", "number": 1, "enabled": true, "input": 155, "operator": 4, "arg": 1},
+        {"name": "CRANKED", "number": 2, "enabled": true, "input": 156, "operator": 4, "arg": 1},
+        {"name": "HEATER_LATCHED", "number": 3, "enabled": true, "input": 157, "operator": 4, "arg": 1}
+      ]
+    }
+  ],
+  "CanboardDevices": [],
+  "DbcDevices": [],
+  "BlinkMarineKeypads": [],
+  "GrayhillKeypads": []
+}

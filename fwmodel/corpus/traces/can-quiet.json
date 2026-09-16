@@ -1,0 +1,23 @@
+{
+  "name": "CAN bus goes quiet: canInput timeout paths",
+  "_notes": [
+    "Every canInput in the hilux configs has timeoutEnabled with timeout 500.",
+    "can_input.cpp CheckTimeout zeroes BOTH fOutput and fVal once no matching",
+    "frame has arrived for longer than the timeout. Drive this against either",
+    "PDM. It is the only trace that exercises the timeout branch, and a",
+    "compiler that drops timeoutEnabled/timeout will pass every other trace."
+  ],
+  "steps": [
+    {"label": "idle", "ms": 300, "pins": {"1": 1, "2": 1},
+     "bits": {"0x642:32": 0, "0x642:33": 0, "0x642:34": 0, "0x642:35": 0,
+              "0x642:36": 0, "0x642:37": 0, "0x642:38": 0, "0x642:39": 0,
+              "0x300:0": 0, "0x301:0": 0, "0x301:1": 0}},
+    {"label": "several inputs asserted", "ms": 400,
+     "bits": {"0x642:35": 1, "0x642:36": 1, "0x642:39": 1, "0x301:0": 1}},
+    {"label": "CANBoard stops transmitting", "ms": 1200, "quiet": ["0x642"]},
+    {"label": "engine PDM stops transmitting too", "ms": 1200, "quiet": ["0x301"]},
+    {"label": "everything comes back", "ms": 800, "loud": ["0x642", "0x301"]},
+    {"label": "release", "ms": 400,
+     "bits": {"0x642:35": 0, "0x642:36": 0, "0x642:39": 0, "0x301:0": 0}}
+  ]
+}

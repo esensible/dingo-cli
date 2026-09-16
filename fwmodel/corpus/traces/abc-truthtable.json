@@ -1,0 +1,311 @@
+{
+  "name": "A/B/C exhaustive: every input combination, then every single-bit walk",
+  "_notes": [
+    "Drives the adversarial logic cases. A=0x642 bit32, B=bit33, C=bit34.",
+    "Each combination is held for 40 ms (20 cycles), long enough for any",
+    "one- or two-cycle pipeline to settle, then the walk section changes one",
+    "bit at a time so edge-triggered logic is exercised as well as levels.",
+    "The 'C held' section is load-bearing: a stale read of an intermediate term is INVISIBLE unless that term changes while the other operand is already asserted, or the two change in the same step. A trace that only walks one bit at a time between long holds will pass a wrongly-ordered config."
+  ],
+  "steps": [
+    {
+      "label": "000",
+      "ms": 60,
+      "bits": {
+        "0x642:32": 0,
+        "0x642:33": 0,
+        "0x642:34": 0
+      }
+    },
+    {
+      "label": "001",
+      "ms": 40,
+      "bits": {
+        "0x642:34": 1
+      }
+    },
+    {
+      "label": "010",
+      "ms": 40,
+      "bits": {
+        "0x642:33": 1,
+        "0x642:34": 0
+      }
+    },
+    {
+      "label": "011",
+      "ms": 40,
+      "bits": {
+        "0x642:34": 1
+      }
+    },
+    {
+      "label": "100",
+      "ms": 40,
+      "bits": {
+        "0x642:32": 1,
+        "0x642:33": 0,
+        "0x642:34": 0
+      }
+    },
+    {
+      "label": "101",
+      "ms": 40,
+      "bits": {
+        "0x642:34": 1
+      }
+    },
+    {
+      "label": "110",
+      "ms": 40,
+      "bits": {
+        "0x642:33": 1,
+        "0x642:34": 0
+      }
+    },
+    {
+      "label": "111",
+      "ms": 40,
+      "bits": {
+        "0x642:34": 1
+      }
+    },
+    {
+      "label": "000",
+      "ms": 40,
+      "bits": {
+        "0x642:32": 0,
+        "0x642:33": 0,
+        "0x642:34": 0
+      }
+    },
+    {
+      "label": "walk A up",
+      "ms": 30,
+      "bits": {
+        "0x642:32": 1
+      }
+    },
+    {
+      "label": "walk A down",
+      "ms": 30,
+      "bits": {
+        "0x642:32": 0
+      }
+    },
+    {
+      "label": "walk B up",
+      "ms": 30,
+      "bits": {
+        "0x642:33": 1
+      }
+    },
+    {
+      "label": "walk B down",
+      "ms": 30,
+      "bits": {
+        "0x642:33": 0
+      }
+    },
+    {
+      "label": "walk A up",
+      "ms": 30,
+      "bits": {
+        "0x642:32": 1
+      }
+    },
+    {
+      "label": "walk B up",
+      "ms": 30,
+      "bits": {
+        "0x642:33": 1
+      }
+    },
+    {
+      "label": "walk A down",
+      "ms": 30,
+      "bits": {
+        "0x642:32": 0
+      }
+    },
+    {
+      "label": "walk B down",
+      "ms": 30,
+      "bits": {
+        "0x642:33": 0
+      }
+    },
+    {
+      "label": "walk C up",
+      "ms": 30,
+      "bits": {
+        "0x642:34": 1
+      }
+    },
+    {
+      "label": "walk C down",
+      "ms": 30,
+      "bits": {
+        "0x642:34": 0
+      }
+    },
+    {
+      "label": "A pulse 1",
+      "ms": 20,
+      "bits": {
+        "0x642:32": 1
+      }
+    },
+    {
+      "label": "A gap",
+      "ms": 20,
+      "bits": {
+        "0x642:32": 0
+      }
+    },
+    {
+      "label": "A pulse 2",
+      "ms": 20,
+      "bits": {
+        "0x642:32": 1
+      }
+    },
+    {
+      "label": "A gap",
+      "ms": 20,
+      "bits": {
+        "0x642:32": 0
+      }
+    },
+    {
+      "label": "B pulse",
+      "ms": 20,
+      "bits": {
+        "0x642:33": 1
+      }
+    },
+    {
+      "label": "B gap",
+      "ms": 20,
+      "bits": {
+        "0x642:33": 0
+      }
+    },
+    {
+      "label": "A pulse 3",
+      "ms": 20,
+      "bits": {
+        "0x642:32": 1
+      }
+    },
+    {
+      "label": "settle",
+      "ms": 60,
+      "bits": {
+        "0x642:32": 0
+      }
+    },
+    {
+      "label": "C held high",
+      "ms": 40,
+      "bits": {
+        "0x642:32": 0,
+        "0x642:33": 0,
+        "0x642:34": 1
+      }
+    },
+    {
+      "label": "C held: A up",
+      "ms": 30,
+      "bits": {
+        "0x642:32": 1
+      }
+    },
+    {
+      "label": "C held: B up (A&B rises under C)",
+      "ms": 30,
+      "bits": {
+        "0x642:33": 1
+      }
+    },
+    {
+      "label": "C held: B down",
+      "ms": 30,
+      "bits": {
+        "0x642:33": 0
+      }
+    },
+    {
+      "label": "C held: A down",
+      "ms": 30,
+      "bits": {
+        "0x642:32": 0
+      }
+    },
+    {
+      "label": "C held: A+B up together",
+      "ms": 30,
+      "bits": {
+        "0x642:32": 1,
+        "0x642:33": 1
+      }
+    },
+    {
+      "label": "C held: A+B down together",
+      "ms": 30,
+      "bits": {
+        "0x642:32": 0,
+        "0x642:33": 0
+      }
+    },
+    {
+      "label": "A+B held",
+      "ms": 40,
+      "bits": {
+        "0x642:32": 1,
+        "0x642:33": 1,
+        "0x642:34": 0
+      }
+    },
+    {
+      "label": "A+B held: C up",
+      "ms": 30,
+      "bits": {
+        "0x642:34": 1
+      }
+    },
+    {
+      "label": "simultaneous: all three down",
+      "ms": 30,
+      "bits": {
+        "0x642:32": 0,
+        "0x642:33": 0,
+        "0x642:34": 0
+      }
+    },
+    {
+      "label": "simultaneous: all three up",
+      "ms": 30,
+      "bits": {
+        "0x642:32": 1,
+        "0x642:33": 1,
+        "0x642:34": 1
+      }
+    },
+    {
+      "label": "simultaneous: A down, C stays",
+      "ms": 30,
+      "bits": {
+        "0x642:32": 0
+      }
+    },
+    {
+      "label": "settle",
+      "ms": 60,
+      "bits": {
+        "0x642:33": 0,
+        "0x642:34": 0
+      }
+    }
+  ]
+}

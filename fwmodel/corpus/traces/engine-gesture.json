@@ -1,0 +1,58 @@
+{
+  "name": "engine: three-button gesture start, run, gesture stop",
+  "_notes": [
+    "Stimulus for engine-repin.json / engine-wipers-off.json (baseId 512).",
+    "CAN 0x642 byte 4 is the CANBoard digital-input byte: bit32=DI1 washer,",
+    "bit39=DI8 horn. CAN 0x300 bit0 is BRAKE_REQ broadcast by the lights PDM.",
+    "Digital pins are the raw pin level; both inputs are pull-up + invert, so",
+    "pin=1 is 'not pressed' and pin=0 is 'pressed'.",
+    "Outputs: 1 starter, 2 coil-ballast-run, 3 washer-pump, 4 alt-field+ecu,",
+    "5 wiper (Cond1 ENGINE_RUN), 6 coil-direct-start, 7 horn,",
+    "8 canbus-12v (AlwaysTrue -> high from cycle 1).",
+    "This trace deliberately never presses brake and washer together while the",
+    "engine is running -- that combination IS the stop gesture. See",
+    "engine-stop-hazard.json."
+  ],
+  "steps": [
+    {"label": "power-on idle", "ms": 400,
+     "pins": {"1": 1, "2": 1},
+     "bits": {"0x642:32": 0, "0x642:39": 0, "0x300:0": 0}},
+
+    {"label": "stopped: horn alone", "ms": 200, "bits": {"0x642:39": 1}},
+    {"label": "stopped: release horn", "ms": 200, "bits": {"0x642:39": 0}},
+    {"label": "stopped: washer alone (no pump)", "ms": 200, "bits": {"0x642:32": 1}},
+    {"label": "stopped: release washer", "ms": 200, "bits": {"0x642:32": 0}},
+
+    {"label": "brake down", "ms": 150, "bits": {"0x300:0": 1}},
+    {"label": "+ washer -> CHORD", "ms": 250, "bits": {"0x642:32": 1}},
+    {"label": "+ horn -> START_REQ crank", "ms": 900, "bits": {"0x642:39": 1}},
+    {"label": "release horn, still holding chord", "ms": 300, "bits": {"0x642:39": 0}},
+    {"label": "release washer", "ms": 60, "bits": {"0x642:32": 0}},
+    {"label": "release brake -> ENGINE_RUN latches", "ms": 600, "bits": {"0x300:0": 0}},
+
+    {"label": "running: horn alone", "ms": 200, "bits": {"0x642:39": 1}},
+    {"label": "running: release horn", "ms": 200, "bits": {"0x642:39": 0}},
+    {"label": "running: washer alone -> pump", "ms": 400, "bits": {"0x642:32": 1}},
+    {"label": "running: release washer", "ms": 200, "bits": {"0x642:32": 0}},
+    {"label": "running: brake alone", "ms": 300, "bits": {"0x300:0": 1}},
+    {"label": "running: release brake", "ms": 300, "bits": {"0x300:0": 0}},
+
+    {"label": "running: heater press 1", "ms": 200, "pins": {"1": 0}},
+    {"label": "running: heater release", "ms": 300, "pins": {"1": 1}},
+    {"label": "running: heater press 2", "ms": 200, "pins": {"1": 0}},
+    {"label": "running: heater release", "ms": 300, "pins": {"1": 1}},
+
+    {"label": "running: park brake on", "ms": 300, "pins": {"2": 0}},
+    {"label": "running: park brake off", "ms": 300, "pins": {"2": 1}},
+
+    {"label": "stop: brake down", "ms": 150, "bits": {"0x300:0": 1}},
+    {"label": "stop: + washer -> CHORD, engine stops", "ms": 600, "bits": {"0x642:32": 1}},
+    {"label": "release chord", "ms": 600, "bits": {"0x300:0": 0, "0x642:32": 0}},
+
+    {"label": "stopped: horn still works", "ms": 200, "bits": {"0x642:39": 1}},
+    {"label": "stopped: release", "ms": 400, "bits": {"0x642:39": 0}},
+
+    {"label": "stopped: heater press (must not latch)", "ms": 200, "pins": {"1": 0}},
+    {"label": "stopped: heater release", "ms": 400, "pins": {"1": 1}}
+  ]
+}
