@@ -2,8 +2,19 @@
 // format) and projects a chosen PDM device directly into wire parameters for
 // WriteAll. There is no intermediate model: the dingoConfig field names are
 // bridged to firmware (index, subindex) here, and value types/encoding are
-// reused from the params registry. The CLI only consumes this format (never
-// writes it), so no serialization/round-trip concerns apply.
+// reused from the params registry.
+//
+// A field the document does not mention is written at the FIRMWARE DEFAULT, not
+// skipped. This matches the GUI, whose model objects carry field initialisers
+// agreeing with the firmware defaults, so loading a partial document there still
+// yields a fully-defined configuration. Skipping would instead leave the device
+// holding whatever the previous config put in that field, which means the same
+// JSON applied to two differently-configured devices produces two different
+// devices — the document would not actually define the state it appears to.
+//
+// The defaults come from the params registry, never from Go zero values. That
+// distinction is load-bearing: `bitrate` 0 is 1000 kbit/s rather than "unset",
+// and `primaryOutput` 0 pairs an output, where "unpaired" is -1.
 package pdmcfg
 
 import (
@@ -95,10 +106,27 @@ type configFile struct {
 	PdmDevices []json.RawMessage `json:"PdmDevices"`
 }
 
+// Options tunes the projection.
+type Options struct {
+	// Partial restores the historical behaviour of writing only the fields the
+	// document mentions, leaving the device's previous value in place for
+	// everything else. It exists for the "patch one field on a live device"
+	// workflow; it does not produce a fully-defined device.
+	Partial bool
+}
+
 // DeviceParams parses a dingoConfig file and projects the PDM device whose
 // baseId matches target into wire params. If the file has exactly one PDM, it is
 // used regardless of baseId.
+//
+// Every parameter the target board has is written: fields the document omits
+// take the firmware default.
 func DeviceParams(data []byte, target uint16) ([]dingo.Param, error) {
+	return DeviceParamsOpts(data, target, Options{})
+}
+
+// DeviceParamsOpts is DeviceParams with explicit options.
+func DeviceParamsOpts(data []byte, target uint16, opt Options) ([]dingo.Param, error) {
 	var f configFile
 	if err := json.Unmarshal(data, &f); err != nil {
 		return nil, fmt.Errorf("parse dingoConfig file: %w", err)
@@ -130,15 +158,53 @@ func DeviceParams(data []byte, target uint16) ([]dingo.Param, error) {
 			return nil, fmt.Errorf("no PDM with baseId %d in file (have %v); use -base to pick one", target, ids)
 		}
 	}
-	return project(chosen)
+	return project(chosen, opt)
 }
 
-func project(m map[string]json.RawMessage) ([]dingo.Param, error) {
-	var out []dingo.Param
+// boardOf picks the parameter table to project against.
+//
+// pdmType is authoritative when present — it is the discriminator the GUI
+// writes. Failing that, the number of outputs identifies the variant well
+// enough (8 for a dingoPDM, 4 for a Max or PT-DPDM), and a document that
+// matches nothing falls back to the board this CLI has always assumed.
+func boardOf(m map[string]json.RawMessage) params.Board {
+	if raw, ok := m["pdmType"]; ok {
+		var t int
+		if json.Unmarshal(raw, &t) == nil {
+			for _, b := range params.Boards() {
+				if !b.IsCanboard && b.PdmType == t {
+					return b
+				}
+			}
+		}
+	}
+	if raw, ok := m["outputs"]; ok {
+		var arr []json.RawMessage
+		if json.Unmarshal(raw, &arr) == nil {
+			for _, b := range params.Boards() {
+				if !b.IsCanboard && b.Outputs == len(arr) {
+					return b
+				}
+			}
+		}
+	}
+	return params.DefaultBoard()
+}
+
+// values is every scalar the document supplies, keyed by index<<8|sub.
+type values map[uint32]interface{}
+
+func key(index uint16, sub uint8) uint32 { return uint32(index)<<8 | uint32(sub) }
+
+func project(m map[string]json.RawMessage, opt Options) ([]dingo.Param, error) {
+	board := boardOf(m)
+	reg := params.NewRegistry(board)
+
+	vals := values{}
 
 	// Device-level scalars (index 0x0000).
 	for _, fm := range deviceFields {
-		if err := emitField(&out, m, fm.json, 0x0000, fm.sub); err != nil {
+		if err := collectField(vals, m, fm.json, 0x0000, fm.sub); err != nil {
 			return nil, err
 		}
 	}
@@ -152,7 +218,7 @@ func project(m map[string]json.RawMessage) ([]dingo.Param, error) {
 		for i, inst := range arr {
 			base := g.base + uint16(i)
 			for _, fm := range g.fields {
-				if err := emitField(&out, inst, fm.json, base, fm.sub); err != nil {
+				if err := collectField(vals, inst, fm.json, base, fm.sub); err != nil {
 					return nil, err
 				}
 			}
@@ -164,14 +230,14 @@ func project(m map[string]json.RawMessage) ([]dingo.Param, error) {
 		return nil, err
 	} else if w != nil {
 		for _, fm := range wiperFields {
-			if err := emitField(&out, w, fm.json, 0x1900, fm.sub); err != nil {
+			if err := collectField(vals, w, fm.json, 0x1900, fm.sub); err != nil {
 				return nil, err
 			}
 		}
-		if err := emitArray(&out, w, "speedMap", 0x1900, 12); err != nil {
+		if err := collectArray(vals, w, "speedMap", 0x1900, 12); err != nil {
 			return nil, err
 		}
-		if err := emitArray(&out, w, "intermitTime", 0x1900, 20); err != nil {
+		if err := collectArray(vals, w, "intermitTime", 0x1900, 20); err != nil {
 			return nil, err
 		}
 	}
@@ -180,13 +246,13 @@ func project(m map[string]json.RawMessage) ([]dingo.Param, error) {
 	if s, err := object(m, "starterDisable"); err != nil {
 		return nil, err
 	} else if s != nil {
-		if err := emitField(&out, s, "enabled", 0x1800, 0); err != nil {
+		if err := collectField(vals, s, "enabled", 0x1800, 0); err != nil {
 			return nil, err
 		}
-		if err := emitField(&out, s, "input", 0x1800, 1); err != nil {
+		if err := collectField(vals, s, "input", 0x1800, 1); err != nil {
 			return nil, err
 		}
-		if err := emitArray(&out, s, "outputsDisabled", 0x1800, 2); err != nil {
+		if err := collectArray(vals, s, "outputsDisabled", 0x1800, 2); err != nil {
 			return nil, err
 		}
 	}
@@ -199,7 +265,7 @@ func project(m map[string]json.RawMessage) ([]dingo.Param, error) {
 	for k, kp := range keypads {
 		kbase := uint16(0x3000 + k)
 		for _, fm := range keypadFields {
-			if err := emitField(&out, kp, fm.json, kbase, fm.sub); err != nil {
+			if err := collectField(vals, kp, fm.json, kbase, fm.sub); err != nil {
 				return nil, err
 			}
 		}
@@ -210,7 +276,7 @@ func project(m map[string]json.RawMessage) ([]dingo.Param, error) {
 		for b, bt := range btns {
 			bbase := uint16(0x3100 + k*32 + b)
 			for _, fm := range buttonFields {
-				if err := emitField(&out, bt, fm.json, bbase, fm.sub); err != nil {
+				if err := collectField(vals, bt, fm.json, bbase, fm.sub); err != nil {
 					return nil, err
 				}
 			}
@@ -218,7 +284,7 @@ func project(m map[string]json.RawMessage) ([]dingo.Param, error) {
 				json string
 				sub  uint8
 			}{{"valColors", 2}, {"valVars", 7}, {"valBlink", 12}, {"blinkColors", 17}} {
-				if err := emitArray(&out, bt, a.json, bbase, a.sub); err != nil {
+				if err := collectArray(vals, bt, a.json, bbase, a.sub); err != nil {
 					return nil, err
 				}
 			}
@@ -230,11 +296,41 @@ func project(m map[string]json.RawMessage) ([]dingo.Param, error) {
 		for d, dl := range dials {
 			dbase := uint16(0x3200 + k*4 + d)
 			for _, fm := range dialFields {
-				if err := emitField(&out, dl, fm.json, dbase, fm.sub); err != nil {
+				if err := collectField(vals, dl, fm.json, dbase, fm.sub); err != nil {
 					return nil, err
 				}
 			}
 		}
+	}
+
+	// Every field the document supplied must name a real parameter; a document
+	// that carries more slots than the board has is a mismatch worth failing on
+	// rather than silently dropping.
+	for k := range vals {
+		if _, ok := reg.LookupKey(uint16(k>>8), uint8(k)); !ok {
+			return nil, fmt.Errorf("no firmware param for index 0x%04X sub %d on board %s",
+				uint16(k>>8), uint8(k), board.Name)
+		}
+	}
+
+	// Emit, driving from the registry so nothing the board has is left out.
+	defs := reg.All()
+	out := make([]dingo.Param, 0, len(defs))
+	for i := range defs {
+		d := &defs[i]
+		v, present := vals[key(d.Index, d.Sub)]
+		if !present {
+			if opt.Partial {
+				continue
+			}
+			// Natural units, from the firmware's own table. Never a Go zero.
+			v = d.Default
+		}
+		val, err := reg.Encode(d, v)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, dingo.Param{Index: d.Index, SubIndex: d.Sub, Value: val})
 	}
 
 	sort.Slice(out, func(i, j int) bool {
@@ -246,9 +342,9 @@ func project(m map[string]json.RawMessage) ([]dingo.Param, error) {
 	return out, nil
 }
 
-// emitField encodes one JSON scalar field into a wire param. Absent or null
-// fields are skipped (the device keeps its default).
-func emitField(out *[]dingo.Param, m map[string]json.RawMessage, jsonField string, index uint16, sub uint8) error {
+// collectField records one JSON scalar. Absent or null fields are left for the
+// registry default (or, with Options.Partial, left off the wire entirely).
+func collectField(vals values, m map[string]json.RawMessage, jsonField string, index uint16, sub uint8) error {
 	raw, ok := m[jsonField]
 	if !ok {
 		return nil
@@ -260,20 +356,12 @@ func emitField(out *[]dingo.Param, m map[string]json.RawMessage, jsonField strin
 	if v == nil {
 		return nil
 	}
-	d, ok := params.LookupKey(index, sub)
-	if !ok {
-		return fmt.Errorf("no firmware param for index 0x%04X sub %d (field %s)", index, sub, jsonField)
-	}
-	val, err := params.Encode(d, v)
-	if err != nil {
-		return err
-	}
-	*out = append(*out, dingo.Param{Index: index, SubIndex: sub, Value: val})
+	vals[key(index, sub)] = v
 	return nil
 }
 
-// emitArray encodes a JSON array-of-scalars into consecutive subindices.
-func emitArray(out *[]dingo.Param, m map[string]json.RawMessage, jsonField string, index uint16, subStart uint8) error {
+// collectArray records a JSON array-of-scalars into consecutive subindices.
+func collectArray(vals values, m map[string]json.RawMessage, jsonField string, index uint16, subStart uint8) error {
 	raw, ok := m[jsonField]
 	if !ok {
 		return nil
@@ -286,16 +374,7 @@ func emitArray(out *[]dingo.Param, m map[string]json.RawMessage, jsonField strin
 		if v == nil {
 			continue
 		}
-		sub := subStart + uint8(i)
-		d, ok := params.LookupKey(index, sub)
-		if !ok {
-			return fmt.Errorf("no firmware param for index 0x%04X sub %d (%s[%d])", index, sub, jsonField, i)
-		}
-		val, err := params.Encode(d, v)
-		if err != nil {
-			return err
-		}
-		*out = append(*out, dingo.Param{Index: index, SubIndex: sub, Value: val})
+		vals[key(index, subStart+uint8(i))] = v
 	}
 	return nil
 }

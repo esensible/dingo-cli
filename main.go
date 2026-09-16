@@ -31,7 +31,7 @@ type command struct {
 }
 
 var commands = []command{
-	{"apply", "apply a dingoConfig .json file to the device [-burn]", runApply},
+	{"apply", "apply a dingoConfig .json file to the device [-burn] [-partial]", runApply},
 	{"set", "write one parameter by name: set <name> <value> [-burn]", runSet},
 	{"getn", "read one parameter by name (-name)", runGetn},
 	{"get", "read one raw parameter (-index -sub)", runGet},
@@ -155,6 +155,9 @@ func runApply(args []string) error {
 	fs := flag.NewFlagSet("apply", flag.ExitOnError)
 	c := addConn(fs)
 	burn := fs.Bool("burn", false, "burn to flash after a successful apply")
+	partial := fs.Bool("partial", false,
+		"write only the fields the file mentions, leaving the device's previous value for the rest "+
+			"(the default is to write every parameter, defaulting anything absent)")
 	rest := parseArgs(fs, args)
 	if len(rest) != 1 {
 		return errors.New("apply requires exactly one dingoConfig .json file argument")
@@ -163,7 +166,7 @@ func runApply(args []string) error {
 	if err != nil {
 		return err
 	}
-	cfg, err := pdmcfg.DeviceParams(data, uint16(*c.base))
+	cfg, err := pdmcfg.DeviceParamsOpts(data, uint16(*c.base), pdmcfg.Options{Partial: *partial})
 	if err != nil {
 		return err
 	}
@@ -171,7 +174,11 @@ func runApply(args []string) error {
 		if err := cl.WriteAll(cfg); err != nil {
 			return err
 		}
-		fmt.Printf("applied %d params from %s (count + CRC verified)\n", len(cfg), rest[0])
+		how := "every parameter on the board"
+		if *partial {
+			how = "only the fields the file sets"
+		}
+		fmt.Printf("applied %d params from %s — %s (count + CRC verified)\n", len(cfg), rest[0], how)
 		return maybeBurn(cl, *burn)
 	})
 }

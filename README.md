@@ -36,9 +36,10 @@ are no round-trip/fidelity concerns — the GUI remains the file's author/editor
 ## Commands
 
 ```
-dingo apply <config.json> -port <p> [-base 222] [-burn]
+dingo apply <config.json> -port <p> [-base 222] [-burn] [-partial]
         # parse a dingoConfig file, map the PDM (selected by -base) to wire
         # params, and WriteAll (verifying count + CRC). -burn persists to flash.
+        # -partial writes only the fields the file mentions (see "apply details").
 
 # Live single-parameter access (by human name; addressing convenience, not a file format)
 dingo set  -port <p> [-base 222] [-burn] <name> <value>   # e.g. set "output[4].currentLimit" 15
@@ -63,14 +64,33 @@ and an unknown/misplaced flag is rejected rather than silently ignored.
 
 ### `apply` details
 
+- **An absent field means the firmware default, not "leave the device alone".**
+  Every parameter the target board has is written; anything the document omits
+  takes its default from the parameter registry. This matches the GUI, whose
+  model objects carry field initialisers agreeing with the firmware defaults, so
+  a partial document there still yields a fully-defined configuration.
+
+  Before this, an omitted field was skipped, which left the device holding
+  whatever the *previous* config put there — so the same JSON applied to two
+  differently-configured devices produced two different devices, and a file that
+  looked complete on disk did not actually define the state it appeared to. If
+  you were relying on a partial file to patch one field of a live device, pass
+  `-partial` (or use `dingo set`), and be aware that it does not leave the device
+  fully defined.
+
+  The defaults come from the registry, never from Go zero values: `bitrate` 0 is
+  1000 kbit/s rather than "unset", and `primaryOutput` 0 pairs an output where
+  "unpaired" is -1.
 - Selects the PDM device in the file whose `baseId` matches `-base` (a
   single-PDM file is used regardless). Multi-device files (e.g. with CANBoard /
   DBC / keypad entries) are fine — non-PDM and other-PDM entries are ignored.
+- Picks the parameter table from the document's `pdmType` (falling back to the
+  number of outputs, then to dingopdm_v7), so a 4-output variant is never sent
+  parameters for outputs it does not have, and a document that carries more slots
+  than the named board is rejected rather than silently truncated.
 - Maps every PDM field to the firmware parameter (SDO-style) protocol —
   `{index, subindex, value}` frames — using the firmware param table; enums,
   var-map references, and floats (IEEE-754) are encoded as the firmware expects.
-- Variable-output variants (e.g. dingoPDM-Max with 4 outputs) work because the
-  projection follows the file's actual array lengths.
 - The device self-verifies: `WriteAll` returns a parameter count and CRC-32 that
   the CLI checks, so a successful `apply` means the device holds exactly the
   config you sent.

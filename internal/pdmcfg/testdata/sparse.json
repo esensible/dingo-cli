@@ -1,0 +1,33 @@
+{
+  "PdmDevices": [
+    {
+      "pdmType": 0,
+      "name": "sparse",
+      "baseId": 512,
+      "connectUsbToCan": true,
+      "inputs": [
+        {"name": "SW1", "number": 1, "enabled": true, "pull": 1, "invert": true}
+      ],
+      "outputs": [
+        {"name": "pump", "number": 1, "enabled": true, "input": 5, "currentLimit": 13},
+        {"enabled": false, "number": 2}
+      ],
+      "canInputs": [
+        {"name": "brake", "number": 1, "enabled": true, "id": 768, "startBit": 0, "bitLength": 1, "operand": 1}
+      ],
+      "canOutputs": [
+        {"name": "status", "number": 1, "enabled": true, "input": 87, "id": 769, "startBit": 0, "bitLength": 1, "interval": 100}
+      ],
+      "virtualInputs": [
+        {"name": "V1", "number": 1, "enabled": true, "var0": 5, "cond0": 0, "var1": 7, "var2": 0}
+      ],
+      "counters": [
+        {"name": "c1", "number": 1, "enabled": true, "incInput": 5, "maxCount": 1}
+      ]
+    }
+  ],
+  "CanboardDevices": [],
+  "DbcDevices": [],
+  "BlinkMarineKeypads": [],
+  "GrayhillKeypads": []
+}
