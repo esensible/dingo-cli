@@ -1,0 +1,4 @@
+build/
+fuzzfail/
+__pycache__/
+*.dSYM/
