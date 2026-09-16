@@ -11,7 +11,13 @@ import (
 // or string) into the 32-bit wire value for this parameter's type, validating
 // against the firmware's range so out-of-range values fail here with a clear
 // message instead of being silently rejected by the device.
-func Encode(d *Def, v interface{}) (uint32, error) {
+//
+// It resolves var-map names against the default board; use Registry.Encode to
+// encode for a different variant, whose var map has different indices.
+func Encode(d *Def, v interface{}) (uint32, error) { return defaultReg.Encode(d, v) }
+
+// Encode is Encode against this board's var map.
+func (r *Registry) Encode(d *Def, v interface{}) (uint32, error) {
 	switch d.Type {
 	case TBool:
 		bv, err := toBool(v)
@@ -86,7 +92,7 @@ func Encode(d *Def, v interface{}) (uint32, error) {
 
 	case TVarMap:
 		if s, ok := v.(string); ok {
-			if idx, ok := VarIndex(s); ok {
+			if idx, ok := r.VarIndex(s); ok {
 				return uint32(idx), nil
 			}
 			return 0, fmt.Errorf("%s: unknown variable %q", d.Name, s)
@@ -95,8 +101,8 @@ func Encode(d *Def, v interface{}) (uint32, error) {
 		if err != nil {
 			return 0, fmt.Errorf("%s: %w", d.Name, err)
 		}
-		if n < 0 || n >= int64(VarMapSize()) {
-			return 0, fmt.Errorf("%s: var-map index %d out of range (0..%d)", d.Name, n, VarMapSize()-1)
+		if n < 0 || n >= int64(r.VarMapSize()) {
+			return 0, fmt.Errorf("%s: var-map index %d out of range (0..%d)", d.Name, n, r.VarMapSize()-1)
 		}
 		return uint32(n), nil
 	}
@@ -113,7 +119,10 @@ func (d *Def) checkRange(v float64) error {
 
 // Decode renders a raw wire value as a typed, human-friendly config value (for
 // named dumps): bool, number, float, canonical enum name, or var name.
-func Decode(d *Def, raw uint32) interface{} {
+func Decode(d *Def, raw uint32) interface{} { return defaultReg.Decode(d, raw) }
+
+// Decode is Decode against this board's var map.
+func (r *Registry) Decode(d *Def, raw uint32) interface{} {
 	switch d.Type {
 	case TBool:
 		return raw != 0
@@ -129,7 +138,7 @@ func Decode(d *Def, raw uint32) interface{} {
 		}
 		return raw
 	case TVarMap:
-		if n := VarName(uint16(raw)); n != "" {
+		if n := r.VarName(uint16(raw)); n != "" {
 			return n
 		}
 		return raw

@@ -1,12 +1,18 @@
-// Package params is the name-based, type-aware parameter registry for the
-// dingoPDM (board dingopdm_v7). It mirrors the firmware's compile-time parameter
-// table (DingoPDM_FW/core/param_defs.h + boards/dingopdm_v7/params.h), so every
-// configurable field the UI exposes is addressable by a stable name and encoded
-// with the correct wire type and firmware range.
+// Package params is the name-based, type-aware parameter registry for the dingo
+// firmware family. It mirrors the firmware's compile-time parameter table
+// (dingoFW/core/param_defs.h + param_registry.cpp), so every configurable field
+// the UI exposes is addressable by a stable name and encoded with the correct
+// wire type and firmware range.
 //
 // Naming: <block>[<instance>].<field>. Every [n] is 1-based, matching the UI and
 // silkscreen (e.g. output[4] is the 4th output, protocol index 0x1003).
 // Singletons (device, starter, wiper) have no [instance].
+//
+// The table is board-parameterised: NewRegistry(board) builds the exact set of
+// parameters that board's firmware registers, skipping blocks its port.h
+// compiles out. The package-level helpers (Lookup, All, VarIndex, ...) resolve
+// against DefaultBoard() — dingopdm_v7 — preserving the behaviour every existing
+// caller relies on.
 //
 // NOTE: this table is hand-transcribed from the firmware and must be kept in sync
 // with it. The min/max/default columns come from param_defs.h. The eventual fix
@@ -67,36 +73,67 @@ type Def struct {
 	Max     float64
 }
 
-// Board instance counts for dingopdm_v7 (boards/dingopdm_v7/port.h). These are
-// the single source for counts inside the CLI; varmap.go consumes them too.
-const (
-	numOutputs      = 8
-	numDigInputs    = 2
-	numDigOutputs   = 0 // NUM_DIG_OUTPUTS
-	numAnalogInputs = 0 // NUM_ANALOG_INPUTS
-	numCanInputs    = 32
-	numCanOutputs   = 32
-	numVirtInputs   = 16
-	numConditions   = 32
-	numCounters     = 4
-	numFlashers     = 4
-	numKeypads      = 2
-	keypadButtons   = 20 // KEYPAD_MAX_BUTTONS
-	keypadDials     = 2  // KEYPAD_MAX_DIALS
-	keypadAnalogs   = 4  // KEYPAD_MAX_ANALOG_INPUTS
-)
-
 // firmware float range sentinel: F(-1e9f)..F(1e9f) used by factor/offset/operand/arg.
 const (
 	fLo = -1e9
 	fHi = 1e9
 )
 
-var (
+// Registry is the parameter table and var map for one board.
+type Registry struct {
+	board  Board
 	defs   []Def
-	byName = map[string]*Def{}
-	byKey  = map[uint32]*Def{} // index<<8 | sub
-)
+	byName map[string]*Def
+	byKey  map[uint32]*Def // index<<8 | sub
+
+	varNames  []string
+	varByName map[string]uint16
+}
+
+// defaultReg is the dingopdm_v7 registry backing the package-level helpers.
+var defaultReg *Registry
+
+func init() { defaultReg = NewRegistry(DefaultBoard()) }
+
+// Default returns the registry for DefaultBoard().
+func Default() *Registry { return defaultReg }
+
+// NewRegistry builds the parameter table and var map for a board.
+func NewRegistry(b Board) *Registry {
+	r := &Registry{board: b, byName: map[string]*Def{}, byKey: map[uint32]*Def{}}
+	r.buildRegistry()
+	for i := range r.defs {
+		d := &r.defs[i]
+		r.byName[d.Name] = d
+		r.byKey[uint32(d.Index)<<8|uint32(d.Sub)] = d
+	}
+	r.buildVarMap()
+	return r
+}
+
+// Board returns the board this registry was built for.
+func (r *Registry) Board() Board { return r.board }
+
+// Lookup resolves a parameter by name.
+func (r *Registry) Lookup(name string) (*Def, bool) { d, ok := r.byName[name]; return d, ok }
+
+// LookupKey resolves a parameter by index+subindex (for naming a dump).
+func (r *Registry) LookupKey(index uint16, sub uint8) (*Def, bool) {
+	d, ok := r.byKey[uint32(index)<<8|uint32(sub)]
+	return d, ok
+}
+
+// All returns every parameter definition (registration order).
+func (r *Registry) All() []Def { return r.defs }
+
+// Lookup resolves a parameter by name against the default board.
+func Lookup(name string) (*Def, bool) { return defaultReg.Lookup(name) }
+
+// LookupKey resolves a parameter by index+subindex against the default board.
+func LookupKey(index uint16, sub uint8) (*Def, bool) { return defaultReg.LookupKey(index, sub) }
+
+// All returns every parameter definition for the default board.
+func All() []Def { return defaultReg.All() }
 
 // field is one sub-index within an instance block.
 type field struct {
@@ -129,29 +166,8 @@ func i8(sub uint8, name string, def, min, max float64) field {
 	return field{sub, name, TI8, "", def, min, max}
 }
 
-func init() {
-	buildRegistry()
-	for i := range defs {
-		d := &defs[i]
-		byName[d.Name] = d
-		byKey[uint32(d.Index)<<8|uint32(d.Sub)] = d
-	}
-}
-
-// Lookup resolves a parameter by name.
-func Lookup(name string) (*Def, bool) { d, ok := byName[name]; return d, ok }
-
-// LookupKey resolves a parameter by index+subindex (for naming a dump).
-func LookupKey(index uint16, sub uint8) (*Def, bool) {
-	d, ok := byKey[uint32(index)<<8|uint32(sub)]
-	return d, ok
-}
-
-// All returns every parameter definition (registration order).
-func All() []Def { return defs }
-
-func add(name string, index uint16, f field) {
-	defs = append(defs, Def{
+func (r *Registry) add(name string, index uint16, f field) {
+	r.defs = append(r.defs, Def{
 		Name: name, Index: index, Sub: f.sub, Type: f.typ, Enum: f.enum,
 		Default: f.def, Min: f.min, Max: f.max,
 	})
@@ -159,25 +175,27 @@ func add(name string, index uint16, f field) {
 
 // addBlock appends an instanced block: prefix[n].field, n 1-based, for the
 // firmware instances 0..count-1 (index base+0 .. base+count-1).
-func addBlock(prefix string, base uint16, count int, fields []field) {
+func (r *Registry) addBlock(prefix string, base uint16, count int, fields []field) {
 	for i := 0; i < count; i++ {
 		inst := fmt.Sprintf("%s[%d]", prefix, i+1)
 		for _, f := range fields {
-			add(inst+"."+f.name, base+uint16(i), f)
+			r.add(inst+"."+f.name, base+uint16(i), f)
 		}
 	}
 }
 
 // addSingle appends a singleton block: prefix.field (no instance).
-func addSingle(prefix string, base uint16, fields []field) {
+func (r *Registry) addSingle(prefix string, base uint16, fields []field) {
 	for _, f := range fields {
-		add(prefix+"."+f.name, base, f)
+		r.add(prefix+"."+f.name, base, f)
 	}
 }
 
-func buildRegistry() {
+func (r *Registry) buildRegistry() {
+	bd := r.board
+
 	// Device config (0x0000)
-	addSingle("device", 0x0000, []field{
+	r.addSingle("device", 0x0000, []field{
 		u(0, "baseId", TU16, 222, 0, 0x7FF),
 		en(1, "canSpeed", "CanBitrate", 1, 0, 4),
 		b(2, "sleepEnabled", 0),
@@ -186,7 +204,7 @@ func buildRegistry() {
 	})
 
 	// Outputs (0x1000+)
-	addBlock("output", 0x1000, numOutputs, []field{
+	r.addBlock("output", 0x1000, bd.Outputs, []field{
 		b(0, "enabled", 0),
 		vm(1, "input"),
 		fl(2, "currentLimit", 20, 0, 100),
@@ -208,11 +226,11 @@ func buildRegistry() {
 		// 1-based block names, this is a raw index; firmware accepts up to
 		// VAR_MAP_SIZE-1 but ignores anything >= numOutputs, so we validate the
 		// effective range -1..numOutputs-1.
-		i8(17, "primaryOutput", -1, -1, numOutputs-1),
+		i8(17, "primaryOutput", -1, -1, float64(bd.Outputs-1)),
 	})
 
 	// Digital inputs (0x1200+)
-	addBlock("digInput", 0x1200, numDigInputs, []field{
+	r.addBlock("digInput", 0x1200, bd.DigInputs, []field{
 		b(0, "enabled", 0),
 		en(1, "mode", "InputMode", 0, 0, 1),
 		b(2, "invert", 0),
@@ -221,7 +239,7 @@ func buildRegistry() {
 	})
 
 	// CAN inputs (0x1300+)
-	addBlock("canInput", 0x1300, numCanInputs, []field{
+	r.addBlock("canInput", 0x1300, bd.CanInputs, []field{
 		b(0, "enabled", 0),
 		b(1, "timeoutEnabled", 0),
 		u(2, "timeout", TU16, 1000, 0, 60000),
@@ -239,7 +257,7 @@ func buildRegistry() {
 	})
 
 	// Virtual inputs (0x1400+)
-	addBlock("virtualInput", 0x1400, numVirtInputs, []field{
+	r.addBlock("virtualInput", 0x1400, bd.VirtInputs, []field{
 		b(0, "enabled", 0),
 		b(1, "not0", 0),
 		vm(2, "var0"),
@@ -253,7 +271,7 @@ func buildRegistry() {
 	})
 
 	// Conditions (0x1500+)
-	addBlock("condition", 0x1500, numConditions, []field{
+	r.addBlock("condition", 0x1500, bd.Conditions, []field{
 		b(0, "enabled", 0),
 		vm(1, "input"),
 		en(2, "operator", "Operator", 0, 0, 7),
@@ -261,7 +279,7 @@ func buildRegistry() {
 	})
 
 	// Counters (0x1600+)
-	addBlock("counter", 0x1600, numCounters, []field{
+	r.addBlock("counter", 0x1600, bd.Counters, []field{
 		b(0, "enabled", 0),
 		vm(1, "incInput"),
 		vm(2, "decInput"),
@@ -277,7 +295,7 @@ func buildRegistry() {
 	})
 
 	// Flashers (0x1700+)
-	addBlock("flasher", 0x1700, numFlashers, []field{
+	r.addBlock("flasher", 0x1700, bd.Flashers, []field{
 		b(0, "enabled", 0),
 		vm(1, "input"),
 		u(2, "flashOnTime", TU16, 500, 0, 5000),
@@ -286,43 +304,48 @@ func buildRegistry() {
 	})
 
 	// Starter (0x1800, single) + disable-output array (sub 2..2+numOutputs-1)
-	starterFields := []field{
-		b(0, "enabled", 0),
-		vm(1, "input"),
+	if bd.HasStarter {
+		starterFields := []field{
+			b(0, "enabled", 0),
+			vm(1, "input"),
+		}
+		for i := 0; i < bd.Outputs; i++ {
+			starterFields = append(starterFields, b(uint8(2+i), fmt.Sprintf("disableOut[%d]", i+1), 0))
+		}
+		r.addSingle("starter", 0x1800, starterFields)
 	}
-	for i := 0; i < numOutputs; i++ {
-		starterFields = append(starterFields, b(uint8(2+i), fmt.Sprintf("disableOut[%d]", i+1), 0))
-	}
-	addSingle("starter", 0x1800, starterFields)
 
 	// Wiper (0x1900, single): base fields + speedMap[0..7] + intermitTime[0..5]
-	wiperFields := []field{
-		b(0, "enabled", 0),
-		en(1, "mode", "WiperMode", 0, 0, 2),
-		vm(2, "slowInput"),
-		vm(3, "fastInput"),
-		vm(4, "interInput"),
-		vm(5, "onInput"),
-		vm(6, "speedInput"),
-		vm(7, "parkInput"),
-		b(8, "parkStopLevel", 0),
-		vm(9, "swipeInput"),
-		vm(10, "washInput"),
-		u(11, "washWipeCycles", TU8, 3, 0, 10),
+	if bd.HasWipers {
+		wiperFields := []field{
+			b(0, "enabled", 0),
+			en(1, "mode", "WiperMode", 0, 0, 2),
+			vm(2, "slowInput"),
+			vm(3, "fastInput"),
+			vm(4, "interInput"),
+			vm(5, "onInput"),
+			vm(6, "speedInput"),
+			vm(7, "parkInput"),
+			b(8, "parkStopLevel", 0),
+			vm(9, "swipeInput"),
+			vm(10, "washInput"),
+			u(11, "washWipeCycles", TU8, 3, 0, 10),
+		}
+		// eSpeedMap defaults: Intermittent1..6 then Slow, Fast (enums.h WiperSpeed).
+		speedDefaults := []float64{3, 4, 5, 6, 7, 8, 1, 2}
+		for i := 0; i < bd.WiperSpeedMap; i++ {
+			def := speedDefaults[i%len(speedDefaults)]
+			wiperFields = append(wiperFields, en(uint8(12+i), fmt.Sprintf("speedMap[%d]", i+1), "WiperSpeed", def, 0, 8))
+		}
+		// nIntermitTime defaults: 1000..6000 ms.
+		for i := 0; i < bd.WiperInterDelays; i++ {
+			wiperFields = append(wiperFields, u(uint8(20+i), fmt.Sprintf("intermitTime[%d]", i+1), TU16, float64((i+1)*1000), 0, 30000))
+		}
+		r.addSingle("wiper", 0x1900, wiperFields)
 	}
-	// eSpeedMap defaults: Intermittent1..6 then Slow, Fast (enums.h WiperSpeed).
-	speedDefaults := []float64{3, 4, 5, 6, 7, 8, 1, 2}
-	for i := 0; i < 8; i++ {
-		wiperFields = append(wiperFields, en(uint8(12+i), fmt.Sprintf("speedMap[%d]", i+1), "WiperSpeed", speedDefaults[i], 0, 8))
-	}
-	// nIntermitTime defaults: 1000..6000 ms.
-	for i := 0; i < 6; i++ {
-		wiperFields = append(wiperFields, u(uint8(20+i), fmt.Sprintf("intermitTime[%d]", i+1), TU16, float64((i+1)*1000), 0, 30000))
-	}
-	addSingle("wiper", 0x1900, wiperFields)
 
 	// CAN outputs (0x2000+)
-	addBlock("canOutput", 0x2000, numCanOutputs, []field{
+	r.addBlock("canOutput", 0x2000, bd.CanOutputs, []field{
 		b(0, "enabled", 0),
 		vm(1, "input"),
 		u(2, "ide", TU8, 0, 0, 1),
@@ -336,8 +359,28 @@ func buildRegistry() {
 		u(10, "interval", TU16, 1000, 0, 60000),
 	})
 
+	// Digital outputs (0x2100+), CANBoard's low-side drivers.
+	r.addBlock("digOutput", 0x2100, bd.DigOutputs, []field{
+		b(0, "enabled", 0),
+		vm(1, "input"),
+	})
+
+	// Analog inputs (0x2200+): a raw value plus a switch and a rotary decoder.
+	r.addBlock("analogInput", 0x2200, bd.AnalogInputs, []field{
+		b(0, "enabled", 0),
+		b(1, "switch.enabled", 0),
+		en(2, "switch.mode", "InputMode", 0, 0, 1),
+		b(3, "switch.invert", 0),
+		u(4, "switch.threshold", TU16, 2000, 0, 5000),
+		b(5, "rotary.enabled", 0),
+		b(6, "rotary.invert", 0),
+		fl(7, "rotary.offset", 0, fLo, fHi),
+		fl(8, "rotary.step", 100, 1e-6, fHi),
+		fl(9, "rotary.maxPos", 10, 0, fHi),
+	})
+
 	// Keypads base (0x3000+)
-	addBlock("keypad", 0x3000, numKeypads, []field{
+	r.addBlock("keypad", 0x3000, bd.Keypads, []field{
 		b(0, "enabled", 0),
 		u(1, "nodeId", TU8, 0, 0, 127),
 		b(2, "timeoutEnabled", 0),
@@ -354,36 +397,36 @@ func buildRegistry() {
 	})
 
 	// Keypad buttons (0x3100 + k*32 + b) and dials (0x3200 + k*4 + d)
-	for k := 0; k < numKeypads; k++ {
-		for bi := 0; bi < keypadButtons; bi++ {
+	for k := 0; k < bd.Keypads; k++ {
+		for bi := 0; bi < bd.KeypadButtons; bi++ {
 			base := uint16(0x3100 + k*32 + bi)
 			pre := fmt.Sprintf("keypad[%d].button[%d]", k+1, bi+1)
-			add(pre+".enabled", base, b(0, "enabled", 0))
-			add(pre+".mode", base, en(1, "mode", "InputMode", 0, 0, 1))
+			r.add(pre+".enabled", base, b(0, "enabled", 0))
+			r.add(pre+".mode", base, en(1, "mode", "InputMode", 0, 0, 1))
 			for c := 0; c < 4; c++ {
-				add(fmt.Sprintf("%s.colors[%d]", pre, c+1), base, u(uint8(2+c), "", TU8, 0, 0, 7))
+				r.add(fmt.Sprintf("%s.colors[%d]", pre, c+1), base, u(uint8(2+c), "", TU8, 0, 0, 7))
 			}
-			add(pre+".faultColor", base, u(6, "", TU8, 0, 0, 7))
+			r.add(pre+".faultColor", base, u(6, "", TU8, 0, 0, 7))
 			for v := 0; v < 4; v++ {
-				add(fmt.Sprintf("%s.vars[%d]", pre, v+1), base, vm(uint8(7+v), ""))
+				r.add(fmt.Sprintf("%s.vars[%d]", pre, v+1), base, vm(uint8(7+v), ""))
 			}
-			add(pre+".faultVar", base, vm(11, ""))
+			r.add(pre+".faultVar", base, vm(11, ""))
 			for v := 0; v < 4; v++ {
-				add(fmt.Sprintf("%s.blink[%d]", pre, v+1), base, b(uint8(12+v), "", 0))
+				r.add(fmt.Sprintf("%s.blink[%d]", pre, v+1), base, b(uint8(12+v), "", 0))
 			}
-			add(pre+".faultBlink", base, b(16, "", 0))
+			r.add(pre+".faultBlink", base, b(16, "", 0))
 			for c := 0; c < 4; c++ {
-				add(fmt.Sprintf("%s.blinkColors[%d]", pre, c+1), base, u(uint8(17+c), "", TU8, 0, 0, 7))
+				r.add(fmt.Sprintf("%s.blinkColors[%d]", pre, c+1), base, u(uint8(17+c), "", TU8, 0, 0, 7))
 			}
-			add(pre+".faultBlinkColor", base, u(21, "", TU8, 0, 0, 7))
+			r.add(pre+".faultBlinkColor", base, u(21, "", TU8, 0, 0, 7))
 		}
-		for d := 0; d < keypadDials; d++ {
+		for d := 0; d < bd.KeypadDials; d++ {
 			base := uint16(0x3200 + k*4 + d)
 			pre := fmt.Sprintf("keypad[%d].dial[%d]", k+1, d+1)
-			add(pre+".enabled", base, b(0, "enabled", 0))
-			add(pre+".minCount", base, u(1, "minCount", TU8, 0, 0, 16))
-			add(pre+".maxCount", base, u(2, "maxCount", TU8, 16, 0, 16))
-			add(pre+".ledOffset", base, u(3, "ledOffset", TU8, 0, 0, 16))
+			r.add(pre+".enabled", base, b(0, "enabled", 0))
+			r.add(pre+".minCount", base, u(1, "minCount", TU8, 0, 0, 16))
+			r.add(pre+".maxCount", base, u(2, "maxCount", TU8, 16, 0, 16))
+			r.add(pre+".ledOffset", base, u(3, "ledOffset", TU8, 0, 0, 16))
 		}
 	}
 }
