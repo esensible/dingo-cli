@@ -79,6 +79,54 @@ to the TX mailbox. To make that observable every cycle rather than every
 DLC come from id/ide/startBit/bitLength), so the values are untouched. The
 firmware posts no frame on cycle 0, so CAN keys are absent there.
 
+### Battery voltage (`batt` trace field)
+
+A step may carry `"batt": 13.5` (volts). It persists across steps like `pins`,
+defaults to 0.0. This matters for any config whose logic pivots on the supply —
+e.g. the engine single-button start machine, where `ENGINE_RUNNING` is the
+condition `BattVolt > 12.4`.
+
+**How battery reaches the logic, and why the harness has to drive it.**
+`CyclicUpdate()` never reads the ADC. It reads the **var map**, and on the
+target a *separate* 250 ms thread keeps the value fresh:
+
+```
+SlowThread (device.cpp)  fBattVolt = GetBattVolt();   // GetBattVolt() reads the ADC + divider
+InitVarMap (device.cpp)  pVarMap[4] = &fBattVolt;      // var 4 on dingopdm_v7
+CyclicUpdate             a Condition with input:4 compares fBattVolt to its arg
+```
+
+The threads never start in the harness, so `fBattVolt` would sit at its
+zero-init value and every voltage-gated condition would read false. The runner
+therefore does `fBattVolt = st.batt` each cycle — the same assignment
+`SlowThread` makes, inlined. `CyclicUpdate()` and `InitVarMap()` are **not**
+modified; the var map still points at `&fBattVolt`. This is the general pattern
+for any value the firmware sources from a thread + peripheral rather than from
+`CyclicUpdate` itself: feed the global the var map points at, from the runner.
+
+## Validating a config change (config A vs config B)
+
+The primary use: prove a config edit is behaviour-preserving against a known-good
+config, without hardware. Run both through `fwhost` with the same trace and diff
+the per-cycle observation vectors.
+
+```
+./build/fwhost cfg-old.json trace.json > run-old.jsonl
+./build/fwhost cfg-new.json trace.json > run-new.jsonl
+# then compare: outputs must match at the end of every labelled phase, and any
+# per-cycle difference must be an explainable transient (e.g. a one-cycle
+# propagation lag when logic is routed through an extra virtual-input slot).
+```
+
+This is exactly how the engine `TRIGGER`-intermediate refactor was validated
+against the car-proven direct-trigger config: 6360 cycles, all phases identical,
+the only differences a handful of single-cycle trigger lags. A worked comparison
+script and start/stop/timeout trace live in the session scratchpad; the durable
+recipe is: **match at phase boundaries, and account for every transient.** Read
+the observed data — a green "they agree" result is only trustworthy once you can
+explain *what* they agree on (twice here a wrong trace produced agreement on a
+degenerate machine; the fix was always to look at the cycle data, not the pass).
+
 ## Cross-check against the Python model
 
 `crosscheck.py` runs both over `fwmodel/corpus/`; `fuzz.py` runs both over
@@ -204,8 +252,9 @@ answer.
 ### What the cross-check validates in the other direction
 
 `varmap.sh` derives each board's var-map layout from the firmware's own
-`InitVarMap()` by locating known object addresses in `pVarMap[]`. All four
-boards match `fwmodel/model/varmap.py` and `fwmodel/corpus/README.md` exactly:
+`InitVarMap()` by locating known object addresses in `pVarMap[]`. The four
+boards `fwmodel` knows about match `fwmodel/model/varmap.py` and
+`fwmodel/corpus/README.md` exactly:
 
 | board | size | DigIn1 | CanIn1Out | VirtIn1 | Out1Active | Flasher1 | Cond1 | Counter1 |
 |---|---|---|---|---|---|---|---|---|
@@ -213,6 +262,11 @@ boards match `fwmodel/model/varmap.py` and `fwmodel/corpus/README.md` exactly:
 | dingopdmmax_v1 | 201 | 5 | 7 | 71 | 87 | 103 | 107 | 139 |
 | pt-dpdm4_1 | 209 | 5 | 15 | 79 | 95 | 111 | 115 | 147 |
 | canboard_v2 | 75 | 3 | 35 | 51 | — | 59 | 63 | 71 |
+| canboard_v2_exp | 90 | 3 | 50 | 66 | — | 74 | 78 | 86 |
+
+`canboard_v2_exp` is the MCP23017 input-expander variant (23 digital inputs
+instead of 8); `fwmodel/model/varmap.py` does not know about it, so that row is
+firmware-derived only.
 
 That includes the two warnings in `fwmodel`'s README: v7 and Max agree on
 `VirtIn1 = 71` and diverge at `Cond1` (123 vs 107); `pt-dpdm4_1`'s `VirtIn1` is
@@ -224,6 +278,35 @@ random cases independently confirm the substance of `fwmodel/model/selftest.py`'
 one-cycle staleness of a later-category producer, virtual-input NAND, the
 counter reset latch, latching vs momentary, debounce, timeouts, flasher timing,
 DBC little/big-endian and signed decode, CAN frame grouping and DLC.
+
+## `probe_expander.cpp` — the MCP23017 input expander
+
+`src/host_i2c.cpp` is a **device model**, not a firmware stand-in: it emulates
+an MCP23017's register file and interrupt-on-change behaviour on the virtual
+I2C bus, so dingoFW's real `hardware/mcp23017.cpp` runs against it unmodified,
+alongside the real `core/device.cpp` and `functions/digital_input.cpp`.
+
+```
+$ DINGOFW=../../dingoFW BOARD=canboard_v2_exp \
+      MAIN=src/probe_expander.cpp OUT=expander ./build.sh && ./build/expander
+...
+all assertions passed (0 failures)
+```
+
+47 assertions across four groups: the 23-input var map and parameter table;
+an expander input tracking a native input cycle-for-cycle through debounce,
+invert and latching; the fail-safe path (bus fault, all 16 inputs forced to
+0 while the native inputs keep working, rate-limited retry, automatic
+recovery); and a completely absent part.
+
+It also pins one pre-existing firmware behaviour that is easy to trip over:
+`Digital_Input` only re-evaluates `input.Check()` on a raw **edge**, so
+changing `invert` or `mode` in the config does not take effect until the pin
+next moves. That is true of native and expander inputs alike.
+
+`src/main.cpp`, the trace runner, does **not** build for either canboard board
+— it references `pf[]`, which only exists where `NUM_OUTPUTS > 0`. That is a
+pre-existing limitation, not specific to the expander variant.
 
 ## `selftest.py` — the two behaviours a reimplementation gets wrong
 
