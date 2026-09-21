@@ -98,8 +98,10 @@ bool WriteConfigExt() { return true; }
 msg_t InitAdc() { return HAL_RET_SUCCESS; }
 void DeInitAdc() {}
 uint16_t GetAdcRaw(AnalogChannel) { return 0; }      // <- current pinned at 0
+static float g_battVolt = 0.0f;
+void hostSetBattVolt(float v) { g_battVolt = v; }
 #if HAS_BATT_VOLT_SENSE
-float GetBattVolt() { return 13.8f; }
+float GetBattVolt() { return g_battVolt; }
 #endif
 
 #if NUM_OUTPUTS > 0

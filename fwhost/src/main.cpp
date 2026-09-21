@@ -43,6 +43,7 @@ struct Step {
     std::map<int, int> pins;                       // 1-based pin -> level
     std::map<uint32_t, std::vector<uint8_t>> payloads;
     std::set<uint32_t> silent;
+    float batt = 0.0f;                             // GetBattVolt() for this step
     int cycles = 1;
     std::string label;
 };
@@ -64,6 +65,7 @@ static bool loadTrace(const std::string &path, std::vector<Step> *out,
     std::map<int, int> pins;
     std::map<uint32_t, std::vector<uint8_t>> payloads;
     std::set<uint32_t> silent;
+    float batt = 0.0f;                             // carries across steps, like pins
 
     for (auto &s : steps->arr) {
         if (auto p = s->get("pins"))
@@ -93,8 +95,11 @@ static bool loadTrace(const std::string &path, std::vector<Step> *out,
             for (auto &v : l->arr)
                 silent.erase(v->kind == JVal::Str ? parseId(v->str) : (uint32_t)v->num);
 
+        if (auto bt = s->get("batt")) batt = (float)bt->num;
+
         Step st;
         st.pins = pins;
+        st.batt = batt;
         for (auto &kv : payloads)
             if (!silent.count(kv.first)) st.payloads[kv.first] = kv.second;
         auto cyc = s->get("cycles");
@@ -171,6 +176,11 @@ int main(int argc, char **argv) {
     for (auto &st : steps) {
         for (int c = 0; c < st.cycles; c++) {
             hostSetTimeMs(ms);
+            hostSetBattVolt(st.batt);
+            // On hardware SlowThread does `fBattVolt = GetBattVolt()` every 250 ms;
+            // that thread never runs here, so bridge it directly each cycle. The
+            // var map reads fBattVolt (var 4), not GetBattVolt().
+            { extern float fBattVolt; fBattVolt = st.batt; }
             hostClearTx();
 
             for (auto &kv : st.pins) {
