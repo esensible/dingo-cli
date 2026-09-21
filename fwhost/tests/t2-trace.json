@@ -1,0 +1,114 @@
+{
+ "name": "counter reset quirk",
+ "steps": [
+  {
+   "ms": 40,
+   "bits": {
+    "0x100:0": 0,
+    "0x100:1": 1
+   },
+   "label": "B high, idle"
+  },
+  {
+   "ms": 20,
+   "bits": {
+    "0x100:0": 1
+   },
+   "label": "A pulse (B high)"
+  },
+  {
+   "ms": 20,
+   "bits": {
+    "0x100:0": 0
+   }
+  },
+  {
+   "ms": 20,
+   "bits": {
+    "0x100:0": 1
+   },
+   "label": "A pulse (B high)"
+  },
+  {
+   "ms": 20,
+   "bits": {
+    "0x100:0": 0
+   }
+  },
+  {
+   "ms": 40,
+   "label": "counter>=1 -> out1 on"
+  },
+  {
+   "ms": 40,
+   "bits": {
+    "0x100:1": 0
+   },
+   "label": "B falling -> reset fires"
+  },
+  {
+   "ms": 20,
+   "bits": {
+    "0x100:0": 1
+   },
+   "label": "A pulse while B LOW"
+  },
+  {
+   "ms": 20,
+   "bits": {
+    "0x100:0": 0
+   }
+  },
+  {
+   "ms": 20,
+   "bits": {
+    "0x100:0": 1
+   },
+   "label": "A pulse while B LOW"
+  },
+  {
+   "ms": 20,
+   "bits": {
+    "0x100:0": 0
+   }
+  },
+  {
+   "ms": 20,
+   "bits": {
+    "0x100:0": 1
+   },
+   "label": "A pulse while B LOW"
+  },
+  {
+   "ms": 20,
+   "bits": {
+    "0x100:0": 0
+   }
+  },
+  {
+   "ms": 40,
+   "label": "held in reset?"
+  },
+  {
+   "ms": 40,
+   "bits": {
+    "0x100:1": 1
+   },
+   "label": "B high again"
+  },
+  {
+   "ms": 20,
+   "bits": {
+    "0x100:0": 1
+   },
+   "label": "A pulse (B high)"
+  },
+  {
+   "ms": 60,
+   "bits": {
+    "0x100:0": 0
+   },
+   "label": "counter should be 1 again"
+  }
+ ]
+}
