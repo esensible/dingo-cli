@@ -57,6 +57,53 @@ right; `core/device.cpp` roughly quadrupled it, but it never got hard — it was
 one compile-error-at-a-time for an afternoon, and nothing needed a judgement
 call about behaviour.
 
+### How the shim is built, and how to regenerate or drift-check it
+
+The shim is **not** a port of ChibiOS. It is the minimum set of declarations
+that satisfy exactly the symbols the compiled logic TUs reference from
+`hal.h`/`ch.hpp`/`board.h` — nothing more. You cannot instead include the real
+ChibiOS headers: `os/hal/include/hal.h` pulls in `osal.h` (the kernel), the
+real 1232-line `board.h` (GPIO tables), and `hal_lld.h` (the STM32 CMSIS
+register map), none of which compile on a host. So the surface is reproduced,
+not borrowed.
+
+**To regenerate it from scratch** (or after a firmware bump), the method is
+mechanical and self-guiding — no judgement about behaviour:
+
+1. Compile the `FWSRC` list from `build.sh` against an empty shim and the
+   `-I$FW/...` include paths. Each undefined type / macro / function the
+   compiler reports is one symbol the logic needs.
+2. Add the thinnest declaration that satisfies it, in one of two kinds:
+   - **Throwaway** — a typedef, a macro that redirects to a `host*` function
+     (`palReadLine` → `hostPalRead`), or an *opaque* struct the firmware only
+     passes to a stubbed driver call (`CANConfig`, `I2CConfig`, `CANDriver`,
+     `I2CDriver`). Shape doesn't matter; the host stub never inspects it.
+   - **Layout-critical** — must match the real memory layout because the
+     firmware type-puns through it. There is exactly **one**: `CANTxFrame` /
+     `CANRxFrame`, copied verbatim from
+     `os/hal/ports/STM32/LLD/CANv1/hal_can_lld.h`. `can_outputs.cpp` writes
+     `data8/16/32/64[]` and relies on `SID`/`EID` being a union (`frame.EID = 0`
+     also clears `SID`). Wrong layout → the firmware computes different bytes.
+     `PWMDriver`'s `CNT`/`ARR`/`CCR` fields are a lesser case: `profet.cpp`
+     reads them, so the fields must exist, but the values come from stubs.
+3. Repeat until it links. Provide the runtime side in `src/host_*.cpp`
+   (`hostPalRead`, the mailbox, the no-op drivers).
+
+**Checking for drift** against a new dingoFW:
+
+- **New symbol referenced** (a function added a `LINE_*`, a new HAL call) →
+  the build **fails loudly**. Add the declaration. Self-announcing; safe.
+- **The CAN frame struct layout changes upstream** → **silent** and dangerous:
+  the build still succeeds but the firmware's byte output changes. This is the
+  one thing to check actively. Diff the shim's `CANTxFrame`/`CANRxFrame` against
+  `$DINGOFW/ChibiOS/os/hal/ports/STM32/LLD/CANv1/hal_can_lld.h`; if they differ,
+  re-copy. Everything else drifts loudly through a compile error.
+
+A future clean fix (worth doing at port time, and pushing upstream to Cory):
+factor the platform-independent logic so it builds as a standalone library with
+no ChibiOS headers at all, which retires the shim. For a validation tool, the
+shim is fine.
+
 Runner and loader (`src/main.cpp`, `src/loader.cpp`, `src/json.cpp`, ~660
 lines) are not shim: they are the trace format, a small JSON reader, and the
 dingoConfig-field → `(index, subindex)` bridge ported from `dingo-cli`'s
