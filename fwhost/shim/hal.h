@@ -104,6 +104,18 @@ typedef struct { uint32_t op_mode; uint32_t clock_speed;
 typedef struct { int state; } I2CDriver;
 extern I2CDriver I2CD1;
 msg_t i2cStart(I2CDriver *p, const I2CConfig *c);
+/* Backed by src/host_i2c.cpp, which emulates an MCP23017 on the bus so the
+   real hardware/mcp23017.cpp runs unmodified. */
+void  i2cAcquireBus(I2CDriver *p);
+void  i2cReleaseBus(I2CDriver *p);
+i2cflags_t i2cGetErrors(I2CDriver *p);
+msg_t i2cMasterTransmitTimeout(I2CDriver *p, i2caddr_t addr,
+                               const uint8_t *txbuf, size_t txbytes,
+                               uint8_t *rxbuf, size_t rxbytes,
+                               sysinterval_t timeout);
+msg_t i2cMasterReceiveTimeout(I2CDriver *p, i2caddr_t addr,
+                              uint8_t *rxbuf, size_t rxbytes,
+                              sysinterval_t timeout);
 
 /* --- PWM ---------------------------------------------------------------- */
 #define PWM_READY 2

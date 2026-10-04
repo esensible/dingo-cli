@@ -78,3 +78,6 @@
 #define LINE_CAN_ID_2               PAL_LINE(GPIOH, 6U)
 #define LINE_NEOPIXEL_INT           PAL_LINE(GPIOH, 7U)
 #define LINE_NEOPIXEL_EXT           PAL_LINE(GPIOH, 8U)
+
+/* canboard_v2_exp: PA10 (was DI8) is the MCP23017's open-drain INT input. */
+#define LINE_IO_EXP_INT             PAL_LINE(GPIOH, 9U)

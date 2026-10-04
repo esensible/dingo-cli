@@ -19,7 +19,7 @@ mkdir -p "$HERE/build"
 INC="-I$HERE/shim -I$HERE/src \
  -I$FW/boards/$BOARD -I$FW/core -I$FW/functions -I$FW/functions/wiper \
  -I$FW/functions/keypad -I$FW/functions/keypad/blink -I$FW/functions/keypad/grayhill \
- -I$FW/utils -I$FW/comms -I$FW"
+ -I$FW/utils -I$FW/comms -I$FW/hardware -I$FW"
 
 # Real firmware sources, compiled unmodified.  Everything here is logic; the
 # translation units left out are the ones that only talk to hardware.
@@ -41,11 +41,18 @@ FWSRC="$FW/functions/virtual_input.cpp $FW/functions/condition.cpp \
  $FW/boards/$BOARD/hw_devices.cpp"
 
 case $BOARD in
-  pt-dpdm4_1|canboard_v2) FWSRC="$FWSRC $FW/functions/analog_input.cpp";;
+  pt-dpdm4_1|canboard_v2|canboard_v2_exp) FWSRC="$FWSRC $FW/functions/analog_input.cpp";;
+esac
+
+# Boards with an I2C input expander compile the real MCP23017 driver; the fake
+# device it talks to lives in src/host_i2c.cpp.
+case $BOARD in
+  canboard_v2_exp) FWSRC="$FWSRC $FW/hardware/mcp23017.cpp";;
 esac
 
 HOSTSRC="$HERE/src/host_io.cpp $HERE/src/host_stubs.cpp \
- $HERE/src/host_stubs_extra.cpp $HERE/src/json.cpp $HERE/src/loader.cpp"
+ $HERE/src/host_stubs_extra.cpp $HERE/src/host_i2c.cpp \
+ $HERE/src/json.cpp $HERE/src/loader.cpp"
 
 c++ -std=c++20 -O1 -g -w $INC $FWSRC $HOSTSRC "$MAIN" -o "$HERE/build/$OUT"
 echo "built build/$OUT  (board $BOARD, firmware $FW)"
