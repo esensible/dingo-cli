@@ -1,0 +1,22 @@
+{
+    "name": "dingo firmware + CLI",
+    // Build first (also usable via the dev-container skills):
+    //   podman build --platform linux/arm64 -f .devcontainer/Containerfile -t dingo-dev:latest .
+    "image": "dingo-dev:latest",
+    "workspaceFolder": "/workspace",
+    "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind",
+    "mounts": [
+        // Sibling ChibiOS firmware repos (corygrant upstream) so they can be built
+        // in this container. Adjust/remove if your checkout layout differs.
+        "source=${localWorkspaceFolder}/../CANBoard_FW,target=/firmware/CANBoard_FW,type=bind",
+        "source=${localWorkspaceFolder}/../DingoPDM_FW,target=/firmware/DingoPDM_FW,type=bind",
+        // Claude Code onboarding/trust/login state (see CLAUDE_CONFIG_DIR below).
+        "type=volume,source=dingo_dot_claude,target=/root/.claude",
+        "type=bind,source=${localEnv:HOME}/.ssh,target=/root/.ssh,readonly"
+    ],
+    "containerEnv": {
+        "CLAUDE_CONFIG_DIR": "/root/.claude",
+        "OPENSSL_armcap": "0"
+    },
+    "remoteUser": "root"
+}

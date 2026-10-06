@@ -1,0 +1,61 @@
+# dingo dev container — builds the dingo firmware (STM32/ChibiOS, ARM) and the
+# dingo-cli (Go). The CANBoard_FW / DingoPDM_FW repos are ChibiOS C++ projects for
+# the STM32F303/F4; the CLI is Go. Serial/DFU to a real device stays on the host
+# (macOS /dev/cu.*) — this image is for BUILDING, not talking to hardware.
+FROM ubuntu:24.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+ARG TARGETARCH
+
+# Apple-Silicon podman advertises SME features the VM can't execute → SIGILL on
+# OpenSSL/crypto. Mirrors silvin-dev / hilux-dev. Harmless elsewhere.
+ENV OPENSSL_armcap=0
+
+# Base build tools (native gcc for host-side codegen, make, git, fetch/unpack).
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        build-essential \
+        make \
+        git \
+        curl \
+        wget \
+        unzip \
+        xz-utils \
+        ca-certificates \
+        jq \
+        python3 \
+        python3-pip \
+        dfu-util \
+        libncursesw6 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Official ARM GNU embedded toolchain (arm-none-eabi). Preferred over Ubuntu's
+# gcc-arm-none-eabi, whose bare-metal C++/newlib multilib is unreliable for ChibiOS.
+RUN ARM_ARCH=$([ "$TARGETARCH" = "amd64" ] && echo "x86_64" || echo "aarch64") && \
+    ARM_VER=13.2.rel1 && \
+    curl -fsSL "https://developer.arm.com/-/media/Files/downloads/gnu/${ARM_VER}/binrel/arm-gnu-toolchain-${ARM_VER}-${ARM_ARCH}-arm-none-eabi.tar.xz" -o /tmp/arm.tar.xz && \
+    mkdir -p /opt/arm-gnu && \
+    tar -xJf /tmp/arm.tar.xz -C /opt/arm-gnu --strip-components=1 && \
+    rm /tmp/arm.tar.xz
+ENV PATH="/opt/arm-gnu/bin:${PATH}"
+
+# Go (build/run the dingo CLI).
+RUN GO_ARCH=$([ "$TARGETARCH" = "amd64" ] && echo "amd64" || echo "arm64") && \
+    curl -fsSL "https://go.dev/dl/go1.22.6.linux-${GO_ARCH}.tar.gz" -o /tmp/go.tgz && \
+    tar -C /usr/local -xzf /tmp/go.tgz && rm /tmp/go.tgz
+ENV PATH="/usr/local/go/bin:/root/go/bin:${PATH}"
+
+# Node 20 (Claude Code's Grep/Glob tools need it) + Claude Code for remote agents.
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
+    apt-get install -y nodejs && rm -rf /var/lib/apt/lists/*
+RUN curl -fsSL https://claude.ai/install.sh | bash
+ENV PATH="/root/.local/bin:${PATH}"
+
+# Verify the toolchains built.
+RUN arm-none-eabi-gcc --version && \
+    arm-none-eabi-g++ --version && \
+    make --version && \
+    go version && \
+    dfu-util --version 2>&1 | head -1
+
+WORKDIR /workspace
+ENTRYPOINT ["bash"]
