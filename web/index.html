@@ -1,0 +1,367 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>dingo-web</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --ground: #EEF0EC; --surface: #FFFFFF; --raised: #FAFBF8;
+    --ink: #15191E; --ink-2: #34404D; --muted: #5A626B;
+    --line: #D5DAD3; --line-2: #E4E8E2; --control: #C9CFC7;
+    --accent: #C2410C; --accent-hover: #9A3412; --accent-soft: #F4C9B3;
+    --info: #1E5BB8; --info-ink: #1E4F9C; --info-bg: #E3ECF9; --info-soft: #EEF4FC; --info-line: #BFD3EF; --info-wash: #F4F8FD;
+    --danger: #A3201A; --danger-bg: #FDF5F4; --danger-line: #E3B3AE;
+    --warn: #8A5300; --warn-line: #E9C38A; --warn-bg: #FFF8EC;
+    --code-bg: #161B21; --code-fg: #D7DCD5;
+    --f-body: 'Barlow', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --f-head: 'Barlow Condensed', 'Arial Narrow', system-ui, sans-serif;
+    --f-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+    color-scheme: light;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--ground); color: var(--ink); font: 16px/1.4 var(--f-body); }
+  a { color: var(--accent); } a:hover { color: var(--accent-hover); }
+  [hidden] { display: none !important; }
+  .mono, code, textarea { font-family: var(--f-mono); }
+  .eb { font: 600 13px var(--f-head); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+  .hint { color: var(--muted); font-size: 14px; }
+  .c-info { color: var(--info-ink); } .c-muted { color: var(--muted); } .c-danger { color: var(--danger); } .c-warn { color: var(--warn); }
+  .ico { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; vertical-align: middle; }
+  .ico.sm { width: 16px; height: 16px; }
+
+  /* buttons */
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 0 18px; border-radius: 10px; font: 600 16px var(--f-body); border: 1px solid var(--control); background: var(--surface); color: var(--ink); cursor: pointer; text-decoration: none; }
+  .btn:hover { border-color: var(--muted); }
+  .btn.pri { background: var(--accent); border-color: var(--accent); color: #FFFFFF; }
+  .btn.pri:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+  .btn.quiet { border-color: transparent; background: transparent; color: var(--muted); }
+  .btn.quiet:hover { color: var(--ink); }
+  .btn.danger { color: var(--danger); border-color: var(--danger-line); }
+  .btn.danger.solid { background: var(--danger); border-color: var(--danger); color: #FFFFFF; }
+  .btn.sm { min-height: 36px; padding: 0 12px; font-size: 14px; }
+  .btn:disabled { opacity: .45; cursor: default; }
+  .linkbtn { border: 0; background: none; padding: 4px 2px; font: 500 15px var(--f-body); color: var(--muted); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+  .linkbtn:hover { color: var(--ink); } .linkbtn:disabled { opacity: .45; cursor: default; }
+  select, input[type=text], input:not([type]), input[type=number] { font: 500 15px var(--f-body); min-height: 40px; border-radius: 10px; border: 1px solid var(--control); padding: 0 10px; background: var(--surface); color: var(--ink); }
+  :focus-visible { outline: 2px solid var(--info); outline-offset: 2px; }
+
+  /* top bar */
+  .top { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 14px 28px; border-bottom: 1px solid var(--line); background: var(--raised); }
+  .brand { font: 700 24px var(--f-head); letter-spacing: .01em; }
+  .tagline { color: var(--muted); font-size: 15px; }
+  .top-right { margin-left: auto; display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap; }
+  .pill { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; padding: 4px 10px; border-radius: 999px; background: var(--line-2); color: var(--ink-2); }
+  .pill.connected { background: var(--info-bg); color: var(--info-ink); }
+  .pill.failed { background: var(--danger-bg); color: var(--danger); }
+  .pill .spin { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--control); border-top-color: var(--ink-2); animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* layout */
+  .wrap { display: flex; flex-wrap: wrap; gap: 24px; padding: 24px 28px 40px; max-width: 1440px; margin: 0 auto; }
+  .rail { flex: 1 1 240px; max-width: 300px; display: flex; flex-direction: column; gap: 10px; }
+  .col { flex: 999 1 600px; min-width: 0; display: flex; flex-direction: column; gap: 20px; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; }
+  @media (max-width: 700px) { .wrap { padding: 16px; } .top { padding: 12px 16px; } .rail { max-width: none; } }
+
+  /* rail */
+  .rail-head { display: flex; justify-content: space-between; align-items: center; }
+  .node { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 12px; border: 1px solid transparent; background: transparent; width: 100%; text-align: left; font: inherit; color: inherit; cursor: pointer; }
+  .node:hover { background: var(--raised); }
+  .node.on { background: var(--surface); border-color: var(--line); }
+  .node .nm { font-weight: 600; } .node .meta { font: 13px var(--f-mono); color: var(--muted); }
+  .dot { width: 10px; height: 10px; border-radius: 50%; flex: none; background: var(--control); }
+  .dot.ok { background: var(--info); }
+  .rail-note { font-size: 13px; color: var(--muted); padding: 4px 6px; }
+  details.addr summary { cursor: pointer; font-size: 14px; color: var(--muted); padding: 4px 6px; }
+  details.addr .row { display: flex; gap: 8px; padding: 8px 6px 0; }
+  details.addr input { width: 120px; font-family: var(--f-mono); }
+  input.bad { border-color: var(--danger); }
+
+  /* selected node */
+  .nodecard { padding: 22px 24px; display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start; }
+  .nodecard h1 { margin: 4px 0 0; font: 700 34px/1.05 var(--f-head); }
+  .kv { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 8px 16px; margin: 0; }
+  .kv dt { color: var(--muted); } .kv dd { margin: 0; }
+  .status { flex: 1 1 300px; display: flex; flex-direction: column; gap: 8px; padding: 16px; border-radius: 12px; background: var(--raised); border: 1px solid var(--line-2); }
+  .status.info { background: var(--info-soft); border-color: transparent; }
+  .status .head { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+  .status.info .head { color: var(--info-ink); }
+  .status .line { font-size: 14px; color: var(--ink-2); }
+  .status .burn { font-size: 14px; color: var(--ink-2); }
+
+  /* configuration */
+  .cfg { padding: 22px 24px; display: flex; flex-direction: column; gap: 16px; }
+  .cfg-head { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+  .cfg-head h2 { margin: 0; font: 700 22px var(--f-head); flex: 1 1 auto; }
+  .cfg-head label { display: flex; align-items: center; gap: 8px; font-size: 15px; color: var(--muted); }
+  .summary { display: flex; flex-wrap: wrap; gap: 16px; align-items: stretch; }
+  .file { flex: 1 1 300px; display: flex; gap: 14px; align-items: center; padding: 14px 16px; border: 1px solid var(--line-2); border-radius: 12px; min-width: 0; }
+  .file .nm { font-weight: 600; overflow-wrap: anywhere; } .file .sub { font-size: 14px; color: var(--muted); overflow-wrap: anywhere; }
+  .stats { flex: 1 1 280px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  .stat { padding: 12px 14px; border: 1px solid var(--line-2); border-radius: 12px; min-width: 0; }
+  .stat .v { font: 20px var(--f-mono); margin-top: 4px; overflow-wrap: anywhere; }
+  .stat .v.txt { font: 600 17px var(--f-body); }
+  .viewbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; border-top: 1px solid var(--line-2); padding-top: 14px; }
+  .seg { display: inline-flex; border: 1px solid var(--control); border-radius: 10px; overflow: hidden; }
+  .seg button { min-height: 38px; padding: 0 16px; border: 0; background: var(--surface); font: 600 15px var(--f-body); color: var(--ink-2); cursor: pointer; }
+  .seg button + button { border-left: 1px solid var(--control); }
+  .seg button[aria-pressed="true"] { background: var(--ink); color: #FFFFFF; }
+  .seg button:disabled { color: var(--control); cursor: default; }
+  .viewbar .tools { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .viewbar select { min-height: 36px; font-size: 14px; }
+  #logicInfo { flex: 1 1 260px; font-size: 13px; color: var(--muted); }
+  #logicHost { height: 600px; position: relative; border: 1px solid var(--line-2); border-radius: 12px; overflow: hidden; background: var(--surface); }
+  /* The vendored editor (web/vendor/dingoconfig-flow, unmodified) themes itself
+     from MudBlazor's palette variables with dark fallbacks, and asks React Flow
+     for colorMode="dark". Supply both from the page's tokens so the canvas sits
+     in the page instead of being a dark hole in it. */
+  #logicHost {
+    --mud-palette-background: var(--raised);
+    --mud-palette-surface: var(--surface);
+    --mud-palette-background-gray: var(--line-2);
+    --mud-palette-lines-default: var(--line);
+    --mud-palette-text-primary: var(--ink);
+    --mud-palette-text-secondary: var(--muted);
+    --mud-palette-primary: var(--accent);
+    --xy-background-pattern-dots-color: var(--control);
+    --xy-connectionline-stroke: var(--muted);
+    --xy-selection-background-color: rgba(194, 65, 12, .06);
+    --xy-selection-border: 1px dotted var(--accent);
+    --xy-minimap-background-color: var(--surface);
+    --xy-minimap-mask-background-color: rgba(21, 25, 30, .07);
+    --xy-minimap-node-background-color: var(--control);
+    --xy-controls-button-background-color: var(--surface);
+    --xy-controls-button-background-color-hover: var(--raised);
+    --xy-controls-button-color: var(--ink-2);
+    --xy-controls-button-color-hover: var(--ink);
+    --xy-controls-button-border-color: var(--line);
+    --xy-controls-box-shadow: 0 1px 2px rgba(21, 25, 30, .08);
+    --xy-attribution-background-color: transparent;
+  }
+  #logicHost .react-flow { font-family: var(--f-body); }
+  #logicHost .df-node { box-shadow: 0 1px 2px rgba(21, 25, 30, .08); }
+  #logicHost .df-node.df-selected { box-shadow: 0 0 0 1px var(--accent), 0 2px 6px rgba(21, 25, 30, .12); }
+  #logicHost .react-flow__minimap { border: 1px solid var(--line); border-radius: 8px; }
+  #logicProps:not(:empty) { margin-top: 12px; padding: 12px 14px; border: 1px solid var(--line-2); border-radius: 12px; background: var(--raised); }
+  .props-head { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  .props-head .btn { min-height: 36px; padding: 0 12px; font-size: 14px; }
+  .props-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 6px 14px; margin: 10px 0 4px; }
+  label.prop { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 14px; }
+  label.prop span { color: var(--muted); }
+  label.prop input[type=number], label.prop input[type=text], label.prop select { width: 130px; min-height: 34px; font-size: 14px; }
+  .empty-logic { padding: 40px 16px; text-align: center; color: var(--muted); border: 1px dashed var(--control); border-radius: 12px; }
+  textarea#config { width: 100%; min-height: 420px; padding: 14px; border-radius: 10px; border: 1px solid var(--code-bg); background: var(--code-bg); color: var(--code-fg); font-size: 13px; line-height: 1.5; resize: vertical; }
+  textarea#config.drag { outline: 3px dashed var(--accent); outline-offset: 2px; }
+  .json-hint { margin: 6px 2px 0; }
+
+  /* actions */
+  .actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+  .actions .hint { flex: 1 1 240px; }
+  details.more { flex-basis: 100%; }
+  details.more summary { cursor: pointer; font-size: 14px; color: var(--muted); font-weight: 600; }
+  details.more .row { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; margin-top: 10px; }
+  details.more label { display: flex; align-items: center; gap: 6px; font-size: 15px; }
+
+  /* problems, confirmations */
+  .prob { background: var(--surface); border: 1px solid var(--danger-line); border-radius: 14px; padding: 20px 22px; display: flex; gap: 16px; align-items: flex-start; }
+  .prob.warning { border-color: var(--warn-line); }
+  .prob > .ico { width: 22px; height: 22px; margin-top: 2px; color: var(--danger); }
+  .prob.warning > .ico { color: var(--warn); }
+  .prob .body { display: flex; flex-direction: column; gap: 10px; flex: 1; min-width: 0; }
+  .prob .eb { color: var(--danger); } .prob.warning .eb { color: var(--warn); }
+  .prob .title { font: 700 24px/1.1 var(--f-head); margin: 0; }
+  .prob p { margin: 0; }
+  .prob ol { margin: 0; padding-left: 22px; display: flex; flex-direction: column; gap: 6px; }
+  .prob .btns { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 2px; }
+  .prob .x { margin-left: auto; align-self: flex-start; }
+  details.raw summary { cursor: pointer; color: var(--muted); font-size: 14px; font-weight: 600; }
+  details.raw pre { margin: 8px 0 0; padding: 12px; border-radius: 10px; background: var(--code-bg); color: var(--code-fg); font: 12px/1.5 var(--f-mono); white-space: pre-wrap; overflow-wrap: anywhere; max-height: 420px; overflow: auto; }
+  .banner { padding: 16px 28px 0; max-width: 1440px; margin: 0 auto; }
+  .banner:empty { display: none; }
+  @media (max-width: 700px) { .banner { padding: 12px 16px 0; } }
+  .confirm { border-color: var(--danger-line); }
+
+  /* apply panel */
+  .applyp { padding: 24px; display: flex; flex-direction: column; gap: 16px; }
+  .applyp h2 { margin: 4px 0 0; font: 700 30px/1.05 var(--f-head); }
+  .bar { height: 10px; border-radius: 999px; background: var(--line-2); overflow: hidden; position: relative; }
+  .bar > div { height: 100%; background: var(--accent); border-radius: 999px; transition: width .15s; }
+  .bar.indet > div { width: 30%; position: absolute; animation: indet 1.2s ease-in-out infinite; }
+  @keyframes indet { from { left: -30%; } to { left: 100%; } }
+  .steps .row { display: flex; align-items: center; gap: 14px; padding: 12px 0; }
+  .steps .row + .row { border-top: 1px solid var(--line-2); }
+  .steps .lbl { flex: 1; } .steps .note { font: 13px var(--f-mono); color: var(--muted); }
+  .st { width: 26px; height: 26px; border-radius: 50%; flex: none; display: flex; align-items: center; justify-content: center; }
+  .st.done { background: var(--ink); color: #FFFFFF; }
+  .st.now { border: 3px solid var(--accent-soft); border-top-color: var(--accent); animation: spin 1s linear infinite; }
+  .st.todo { border: 2px solid var(--control); }
+  .st.failed { background: var(--danger); color: #FFFFFF; }
+  .steps .row.todo .lbl { color: var(--muted); } .steps .row.now .lbl { font-weight: 600; }
+  .result { padding: 18px 20px; display: flex; gap: 16px; align-items: flex-start; border: 1px solid var(--info-line); background: var(--info-wash); border-radius: 12px; }
+  .result .st { background: var(--info); color: #FFFFFF; }
+  .result .title { font: 700 22px var(--f-head); }
+
+  /* last activity strip, activity view */
+  .strip { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 12px 16px; text-decoration: none; color: var(--ink); }
+  .strip:hover { border-color: var(--control); color: var(--ink); }
+  .strip .what { font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+  .strip .when { font: 13px var(--f-mono); color: var(--muted); }
+  .strip .go { margin-left: auto; font-weight: 600; color: var(--accent); }
+  .act { max-width: 980px; margin: 0 auto; padding: 32px 28px; display: flex; flex-direction: column; gap: 16px; }
+  @media (max-width: 700px) { .act { padding: 16px; } }
+  .act-head { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
+  .act-head h1 { margin: 4px 0 0; font: 700 34px/1.05 var(--f-head); }
+  .events { overflow: hidden; }
+  .ev { display: grid; grid-template-columns: 64px 24px minmax(0, 1fr) auto; gap: 4px 12px; align-items: start; padding: 14px 18px; border-top: 1px solid var(--line-2); }
+  .ev:first-child { border-top: 0; }
+  .ev.ev-problem { background: var(--danger-bg); }
+  .ev .t, .ev .dur { font: 500 13px var(--f-mono); color: var(--muted); padding-top: 2px; }
+  .ev .what { font-weight: 600; overflow-wrap: anywhere; }
+  .ev .sub { grid-column: 3 / 5; font-size: 14px; color: var(--muted); overflow-wrap: anywhere; }
+  .ev details.raw { grid-column: 3 / 5; }
+  .ev details.raw summary { font-size: 13px; }
+  .raw-html { margin-top: 8px; font-size: 14px; overflow-x: auto; }
+  .raw-html p { margin: 4px 0; } .raw-html ul { margin: 4px 0; padding-left: 20px; }
+  .raw-html .nodes { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
+  .raw-html button.node { width: auto; padding: 4px 10px; border: 1px solid var(--control); border-radius: 8px; font-size: 14px; }
+  .raw-html button.node.current { border-color: var(--info); color: var(--info-ink); }
+  @media (max-width: 600px) { .ev { grid-template-columns: 56px 20px minmax(0, 1fr); } .ev .dur { grid-column: 3; padding: 0; } .ev .sub, .ev details.raw { grid-column: 1 / 4; } }
+  table.tbl { border-collapse: collapse; width: 100%; font-size: 13px; }
+  table.tbl th, table.tbl td { text-align: left; padding: 3px 10px 3px 0; border-bottom: 1px solid var(--line-2); white-space: nowrap; }
+  table.tbl th { color: var(--muted); font-weight: 600; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; } td.mono { font-family: var(--f-mono); }
+  p.empty { padding: 24px 18px; margin: 0; color: var(--muted); }
+  #fatal { display: none; margin: 16px 28px 0; padding: 12px 16px; border: 1px solid var(--danger-line); background: var(--danger-bg); color: var(--danger); border-radius: 12px; }
+</style>
+</head>
+<body>
+<div id="fatal" role="alert"></div>
+
+<header class="top">
+  <span class="brand">dingo-web</span>
+  <span class="tagline">Configure dingo nodes over the hilux CAN bridge</span>
+  <div class="top-right">
+    <span id="connPill" class="pill" role="status">Loading…</span>
+    <button id="btnConnect" class="btn pri" type="button" title="connect to the remembered hilux bridge; opens the Bluetooth chooser only if there is none">Connect</button>
+    <button id="btnDisconnect" class="btn quiet" type="button">Disconnect</button>
+    <button id="btnChoose" class="linkbtn" type="button" title="always open the Bluetooth chooser (pick hilux again, e.g. to grant the CAN bridge service)">Choose device…</button>
+  </div>
+</header>
+<div id="banner" class="banner" aria-live="polite"></div>
+
+<div id="workspace" class="wrap">
+  <nav class="rail" aria-label="Nodes on the bus">
+    <div class="rail-head">
+      <span class="eb">On the bus</span>
+      <button id="btnDiscover" class="btn quiet sm" type="button" title="listen for status frames, then confirm each node with a version request"><svg class="ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v4h-4"/></svg><span>Find nodes</span></button>
+    </div>
+    <div id="nodes"></div>
+    <span id="railNote" class="rail-note"></span>
+    <div id="railProblem"></div>
+    <details class="addr" id="addrBox">
+      <summary>Enter an address…</summary>
+      <div class="row">
+        <input id="base" class="mono" size="10" placeholder="0x500" aria-label="Node address (base CAN id)" title="the node's base CAN id: decimal (1280) or hex (0x500)">
+        <button id="btnUseBase" class="btn sm" type="button">Select</button>
+      </div>
+      <div id="baseHint" class="rail-note"></div>
+    </details>
+  </nav>
+
+  <main class="col">
+    <section id="nodeCard" class="card nodecard" aria-label="Selected node"></section>
+
+    <section class="card cfg" aria-label="Configuration">
+      <div class="cfg-head">
+        <h2>Configuration</h2>
+        <label>Example
+          <select id="example" title="load an example config">
+            <option value="">Choose…</option>
+            <option value="c6-test">c6-test (C6 body node)</option>
+            <option value="c6-empty">c6-empty (C6 body node)</option>
+            <option value="bench-toggle">bench-toggle (dingoPDM)</option>
+          </select>
+        </label>
+        <button id="btnOpen" class="btn" type="button"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>Open file…</button>
+        <input type="file" id="file" accept=".json,application/json" hidden>
+      </div>
+      <div id="cfgSummary" class="summary"></div>
+      <div class="viewbar">
+        <div class="seg" role="group" aria-label="View">
+          <button type="button" id="viewLogic" aria-pressed="false">Logic</button>
+          <button type="button" id="viewJson" aria-pressed="false">JSON</button>
+        </div>
+        <div class="tools" id="logicTools">
+          <select id="logicAdd" title="enable a function that is not on the canvas yet"><option value="">Add function…</option></select>
+          <button id="btnFit" class="btn sm" type="button" title="fit the graph to the view">Fit</button>
+        </div>
+        <span id="logicInfo"></span>
+      </div>
+      <div id="logicView">
+        <div id="logicConfirm"></div>
+        <div id="logicError"></div>
+        <div id="logicHost"></div>
+        <div id="logicProps"></div>
+      </div>
+      <div id="jsonView">
+        <textarea id="config" spellcheck="false" aria-label="Config JSON" placeholder='Drop a dingoConfig .json here, or paste one: {"PdmDevices":[{"baseId":1280, ...}], ...}'></textarea>
+        <p class="hint json-hint">Edits here redraw the Logic view; edits in the Logic view rewrite this JSON. Drop a .json file on the editor to open it.</p>
+      </div>
+    </section>
+
+    <div id="guard"></div>
+
+    <section id="actions" class="actions" aria-label="Actions">
+      <button id="btnApply" class="btn pri" type="button"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h14M13 6l6 6-6 6"/></svg><span id="applyLabel">Apply</span></button>
+      <button id="btnVerify" class="btn" type="button" title="read the node's running CRC and compare it with the loaded config">Check</button>
+      <button id="btnBurn" class="btn danger" type="button" title="write the node's running config to flash (asks to confirm)">Burn to flash…</button>
+      <span class="hint">Apply sends the config to the running node. Burn keeps it after a power cycle.</span>
+      <details class="more">
+        <summary>More</summary>
+        <div class="row">
+          <label title="write only the fields the file sets (the CRC then will not match the full config)"><input type="checkbox" id="partial"> Partial apply (only fields the file sets)</label>
+          <button id="btnVersion" class="btn sm" type="button">Read firmware version</button>
+          <button id="btnListen" class="btn sm" type="button">Listen to the bus (2 s)</button>
+        </div>
+      </details>
+    </section>
+    <div id="burnConfirm"></div>
+    <div id="actionProblem"></div>
+    <section id="applyPanel" class="card applyp" aria-label="Apply" hidden></section>
+
+    <a id="lastActivity" class="card strip" href="#activity"></a>
+  </main>
+</div>
+
+<div id="activityView" class="act" hidden>
+  <a href="#" style="font-weight:600;text-decoration:none">← Workspace</a>
+  <div class="act-head">
+    <div style="flex:1 1 260px">
+      <span class="eb">This session</span>
+      <h1>Activity</h1>
+    </div>
+    <div class="seg" role="group" aria-label="Show">
+      <button type="button" id="fltAll" aria-pressed="true">Everything</button>
+      <button type="button" id="fltProblems" aria-pressed="false">Problems</button>
+    </div>
+    <button id="btnCopy" class="btn" type="button"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/></svg><span id="copyLabel">Copy for a bug report</span></button>
+  </div>
+  <section id="events" class="card events" aria-label="Events, newest first"></section>
+  <span class="hint">Kept for this page session (a reload starts afresh). Every call through window.api appears here, the page's and an agent's. Copy includes every event with its technical detail, the page, WASM and firmware versions, and the page log with config text left out: nothing from your config files.</span>
+</div>
+
+<script>
+  // Last-resort visibility: if a module fails to load, say so instead of a dead page.
+  window.addEventListener('error', (e) => {
+    const f = document.getElementById('fatal');
+    f.style.display = 'block';
+    f.textContent = 'Page error: ' + (e.message || e.error) + ' — see the console.';
+  });
+</script>
+<script type="module" src="./app.js"></script>
+</body>
+</html>

@@ -1,0 +1,70 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>pdm-web: BLE link check</title>
+<style>
+  body { font: 15px/1.5 -apple-system, sans-serif; margin: 32px; max-width: 720px; }
+  button { font: inherit; padding: 8px 16px; margin-right: 8px; }
+  pre { background: #f4f4f2; padding: 12px; min-height: 200px; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<h1>pdm-web — BLE link check</h1>
+<p>Step 0 of the PDM config app: prove this page can reach the C6 over Web Bluetooth.
+It connects to <code>hilux</code> and reads the keyless <code>result</code> characteristic
+(unencrypted, already in the firmware). No pairing, nothing written.</p>
+<button id="connect">Connect (pick hilux)</button>
+<button id="reconnect">Reconnect (no chooser)</button>
+<button id="read">Read result</button>
+<button id="disconnect">Disconnect</button>
+<pre id="log"></pre>
+<script>
+// The device handle lives on window so it survives hot-swapped code later.
+const SERVICE = 'd9e5a0b0-f7a1-4b6e-9c3d-2a8e1f0b5c4d';
+const RESULT  = 'd9e5a0b5-f7a1-4b6e-9c3d-2a8e1f0b5c4d';
+const BRIDGE  = 'd9e5a0c0-f7a1-4b6e-9c3d-2a8e1f0b5c4d';   // CAN bridge (hilux/wireless-can/BRIDGE.md)
+const logEl = document.getElementById('log');
+function log(...a) { const line = new Date().toISOString().slice(11, 23) + '  ' + a.join(' '); logEl.textContent += line + '\n'; console.log('[pdm-web]', ...a); }
+window.ble = window.ble || { device: null, result: null };
+
+async function open(device) {
+  window.ble.device = device;
+  device.addEventListener('gattserverdisconnected', () => log('disconnected'));
+  log('connecting to', device.name || device.id);
+  const server = await device.gatt.connect();
+  const service = await server.getPrimaryService(SERVICE);
+  window.ble.result = await service.getCharacteristic(RESULT);
+  log('connected; service + result characteristic found');
+  await read();
+}
+async function read() {
+  const v = await window.ble.result.readValue();
+  log('result =', Array.from(new Uint8Array(v.buffer)).map(b => b.toString(16).padStart(2, '0')).join(' '));
+}
+async function connect() {
+  const device = await navigator.bluetooth.requestDevice({ filters: [{ name: 'hilux' }], optionalServices: [SERVICE, BRIDGE] });
+  await open(device);
+}
+async function reconnect() {
+  const devices = await navigator.bluetooth.getDevices();
+  log('getDevices():', devices.length ? devices.map(d => d.name || d.id).join(', ') : 'none permitted yet');
+  const device = devices.find(d => d.name === 'hilux') || devices[0];
+  if (!device) return;
+  try { await open(device); }
+  catch (e) {
+    // Some platforms need to see an advertisement before connecting to a remembered device.
+    log('direct connect failed (' + e.message + '); waiting for an advertisement');
+    const seen = new Promise(r => device.addEventListener('advertisementreceived', r, { once: true }));
+    await device.watchAdvertisements(); await seen; await open(device);
+  }
+}
+const wrap = f => () => f().catch(e => log('ERROR', e.name + ':', e.message));
+document.getElementById('connect').onclick = wrap(connect);
+document.getElementById('reconnect').onclick = wrap(reconnect);
+document.getElementById('read').onclick = wrap(read);
+document.getElementById('disconnect').onclick = () => window.ble.device && window.ble.device.gatt.disconnect();
+log('Web Bluetooth:', 'bluetooth' in navigator, ' getDevices:', typeof navigator.bluetooth.getDevices === 'function');
+</script>
+</body>
+</html>

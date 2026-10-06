@@ -1,0 +1,35 @@
+[
+  {
+    "name": "dingopdm-config",
+    "dir": "dingopdm-config",
+    "description": "Generate and edit dingoConfig JSON configuration files for dingoPDM power-distribution modules, and apply them to a device with the dingo-cli tool. Use whenever the task is to configure dingoPDM outputs / inputs / CAN inputs+outputs / virtual-input logic / conditions / counters / flashers / wiper / starter / keypads, drive a CANBoard from a PDM, or write a config to hardware. Covers the exact JSON schema, the variable (var-map) reference indices, all enum values, and the behavioral semantics needed to build a correct config from scratch.",
+    "path": "skills/dingopdm-config/SKILL.md",
+    "chars": 32273,
+    "assets": [
+      "skills/dingopdm-config/assets/example.json"
+    ]
+  },
+  {
+    "name": "dingopdm-hardware",
+    "dir": "dingopdm-hardware",
+    "description": "Physical wiring reference for the dingo ecosystem hardware: dingoPDM / dingoPDM-Max power-distribution modules (the main DT/Deutsch connector pinout, connector and socket part numbers, power/ground lugs, USB cabling caveats, CAN termination, output current ratings, MCU test points, and how physical Output/Input pins map to the config's numbering and var-map) and the CANBoard CAN I/O expander (digital/analog inputs, low-side outputs, CAN base-ID and termination jumpers, and the CAN frame layout the PDM uses to read/command it). Use whenever the task involves wiring a dingoPDM or CANBoard, picking connectors/contacts, or relating a physical pin to a configured output/input.",
+    "path": "skills/dingopdm-hardware/SKILL.md",
+    "chars": 10444,
+    "assets": [
+      "skills/dingopdm-hardware/assets/canboard-connections.png",
+      "skills/dingopdm-hardware/assets/canboard-schematic-v2.pdf",
+      "skills/dingopdm-hardware/assets/dingopdm-connections.md",
+      "skills/dingopdm-hardware/assets/dingopdm-connections.svg",
+      "skills/dingopdm-hardware/assets/dingopdm-dt-pinnums.svg",
+      "skills/dingopdm-hardware/assets/dingopdm-schematic-v4.pdf"
+    ]
+  },
+  {
+    "name": "dingo-web-api",
+    "dir": "web-api",
+    "description": "How to do with window.api in the dingo-web page (Chrome, Web Bluetooth to the hilux C6 CAN bridge) everything the other skills do with the `dingo` CLI: discover PDMs, dry-run encode a dingoConfig, apply, verify, burn, read and set parameters, listen to the bus. Includes the CLI → api mapping, the connect/encode/apply/verify/burn workflow, and the safety rules. Read this first, then dingopdm-config before building a config.",
+    "path": "skills/web-api/SKILL.md",
+    "chars": 12750,
+    "assets": []
+  }
+]

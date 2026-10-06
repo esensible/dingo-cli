@@ -1,0 +1,23 @@
+{
+  "PdmDevices": [
+    {
+      "pdmType": 12,
+      "name": "c6-body",
+      "baseId": 1280,
+      "sleepEnabled": false,
+      "filtersEnabled": false,
+      "connectUsbToCan": true,
+      "bitrate": 1,
+      "canInputs": [],
+      "canOutputs": [],
+      "virtualInputs": [],
+      "conditions": [],
+      "counters": [],
+      "flashers": []
+    }
+  ],
+  "CanboardDevices": [],
+  "DbcDevices": [],
+  "BlinkMarineKeypads": [],
+  "GrayhillKeypads": []
+}

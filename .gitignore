@@ -1,4 +1,8 @@
 /bin/
+# dingo-web build outputs (web/build.sh)
+/web/dingo.wasm
+/web/wasm_exec.js
+/web/flow-editor/
 *.tmp
 .DS_Store
 __pycache__/

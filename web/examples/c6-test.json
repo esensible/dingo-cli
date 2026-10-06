@@ -1,0 +1,76 @@
+{
+  "PdmDevices": [
+    {
+      "pdmType": 12,
+      "name": "c6-body-test",
+      "baseId": 1280,
+      "sleepEnabled": false,
+      "filtersEnabled": false,
+      "connectUsbToCan": true,
+      "bitrate": 1,
+      "virtualInputs": [
+        {
+          "name": "always-on (VirtIn1 = var 19)",
+          "number": 1,
+          "enabled": true,
+          "not0": false,
+          "var0": 1,
+          "cond0": 0,
+          "not1": false,
+          "var1": 1,
+          "cond1": 0,
+          "not2": false,
+          "var2": 0,
+          "mode": 0
+        }
+      ],
+      "flashers": [
+        {
+          "name": "blink-1hz (Flasher1 = var 27)",
+          "number": 1,
+          "enabled": true,
+          "input": 19,
+          "onTime": 500,
+          "offTime": 500,
+          "single": false
+        }
+      ],
+      "canOutputs": [
+        {
+          "name": "virtin1 -> 0x5F0 byte 0",
+          "number": 1,
+          "enabled": true,
+          "input": 19,
+          "ide": false,
+          "id": 1520,
+          "startBit": 0,
+          "bitLength": 1,
+          "byteOrder": 0,
+          "signed": false,
+          "factor": 1,
+          "offset": 0,
+          "interval": 100
+        },
+        {
+          "name": "flasher1 -> 0x5F0 byte 1",
+          "number": 2,
+          "enabled": true,
+          "input": 27,
+          "ide": false,
+          "id": 1520,
+          "startBit": 8,
+          "bitLength": 1,
+          "byteOrder": 0,
+          "signed": false,
+          "factor": 1,
+          "offset": 0,
+          "interval": 100
+        }
+      ]
+    }
+  ],
+  "CanboardDevices": [],
+  "DbcDevices": [],
+  "BlinkMarineKeypads": [],
+  "GrayhillKeypads": []
+}

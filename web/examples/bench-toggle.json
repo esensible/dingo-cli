@@ -1,0 +1,228 @@
+{
+  "PdmDevices": [
+    {
+      "pdmType": 0,
+      "name": "bench-toggle",
+      "baseId": 1792,
+      "sleepEnabled": false,
+      "filtersEnabled": false,
+      "connectUsbToCan": true,
+      "bitrate": 1,
+      "outputs": [
+        {
+          "name": "remote-toggle",
+          "number": 1,
+          "enabled": true,
+          "input": 123,
+          "currentLimit": 5,
+          "inrushCurrentLimit": 10,
+          "inrushTime": 300,
+          "resetMode": 2,
+          "resetCountLimit": 5,
+          "resetTime": 1000
+        },
+        {
+          "name": "phone-present",
+          "number": 2,
+          "enabled": true,
+          "input": 9,
+          "currentLimit": 5,
+          "inrushCurrentLimit": 10,
+          "inrushTime": 300,
+          "resetMode": 2,
+          "resetCountLimit": 5,
+          "resetTime": 1000
+        },
+        {
+          "name": "always-on",
+          "number": 3,
+          "enabled": true,
+          "input": 1,
+          "currentLimit": 2,
+          "inrushCurrentLimit": 5,
+          "inrushTime": 300,
+          "resetMode": 2,
+          "resetCountLimit": 5,
+          "resetTime": 1000
+        },
+        {
+          "name": "unlock",
+          "number": 4,
+          "enabled": true,
+          "input": 11,
+          "currentLimit": 5,
+          "inrushCurrentLimit": 10,
+          "inrushTime": 300,
+          "resetMode": 2,
+          "resetCountLimit": 5,
+          "resetTime": 1000
+        }
+      ],
+      "canInputs": [
+        {
+          "name": "C6_PRESS",
+          "number": 1,
+          "enabled": true,
+          "timeoutEnabled": true,
+          "timeout": 500,
+          "ide": false,
+          "id": 1024,
+          "startBit": 0,
+          "bitLength": 8,
+          "byteOrder": 0,
+          "signed": false,
+          "factor": 1,
+          "offset": 0,
+          "operator": 0,
+          "operand": 198,
+          "mode": 0
+        },
+        {
+          "name": "C6_PRESENCE",
+          "number": 2,
+          "enabled": true,
+          "timeoutEnabled": true,
+          "timeout": 5000,
+          "ide": false,
+          "id": 1025,
+          "startBit": 0,
+          "bitLength": 8,
+          "byteOrder": 0,
+          "signed": false,
+          "factor": 1,
+          "offset": 0,
+          "operator": 0,
+          "operand": 198,
+          "mode": 0
+        },
+        {
+          "name": "C6_UNLOCK",
+          "number": 3,
+          "enabled": true,
+          "timeoutEnabled": true,
+          "timeout": 500,
+          "ide": false,
+          "id": 1026,
+          "startBit": 0,
+          "bitLength": 8,
+          "byteOrder": 0,
+          "signed": false,
+          "factor": 1,
+          "offset": 0,
+          "operator": 0,
+          "operand": 198,
+          "mode": 0
+        }
+      ],
+      "counters": [
+        {
+          "name": "toggle-latch",
+          "number": 1,
+          "enabled": true,
+          "incInput": 7,
+          "incEdge": 0,
+          "decInput": 0,
+          "decEdge": 0,
+          "resetInput": 0,
+          "resetEdge": 0,
+          "minCount": 0,
+          "maxCount": 1,
+          "wrapAround": true,
+          "holdToReset": false,
+          "resetTime": 2000
+        }
+      ],
+      "conditions": [
+        {
+          "name": "TOGGLE_ON",
+          "number": 1,
+          "enabled": true,
+          "input": 155,
+          "operator": 4,
+          "arg": 1
+        }
+      ],
+      "canOutputs": [
+        {
+          "name": "out1_active",
+          "number": 1,
+          "enabled": true,
+          "input": 87,
+          "ide": false,
+          "id": 768,
+          "startBit": 0,
+          "bitLength": 1,
+          "byteOrder": 0,
+          "signed": false,
+          "factor": 1,
+          "offset": 0,
+          "interval": 100
+        },
+        {
+          "name": "out2_active",
+          "number": 2,
+          "enabled": true,
+          "input": 91,
+          "ide": false,
+          "id": 768,
+          "startBit": 1,
+          "bitLength": 1,
+          "byteOrder": 0,
+          "signed": false,
+          "factor": 1,
+          "offset": 0,
+          "interval": 100
+        },
+        {
+          "name": "control",
+          "number": 3,
+          "enabled": true,
+          "input": 1,
+          "ide": false,
+          "id": 768,
+          "startBit": 8,
+          "bitLength": 1,
+          "byteOrder": 0,
+          "signed": false,
+          "factor": 1,
+          "offset": 0,
+          "interval": 100
+        },
+        {
+          "name": "out3_active",
+          "number": 4,
+          "enabled": true,
+          "input": 95,
+          "ide": false,
+          "id": 768,
+          "startBit": 2,
+          "bitLength": 1,
+          "byteOrder": 0,
+          "signed": false,
+          "factor": 1,
+          "offset": 0,
+          "interval": 100
+        },
+        {
+          "name": "out4_active",
+          "number": 5,
+          "enabled": true,
+          "input": 99,
+          "ide": false,
+          "id": 768,
+          "startBit": 3,
+          "bitLength": 1,
+          "byteOrder": 0,
+          "signed": false,
+          "factor": 1,
+          "offset": 0,
+          "interval": 100
+        }
+      ]
+    }
+  ],
+  "CanboardDevices": [],
+  "DbcDevices": [],
+  "BlinkMarineKeypads": [],
+  "GrayhillKeypads": []
+}
