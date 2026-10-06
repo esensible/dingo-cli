@@ -458,6 +458,12 @@ To **read CANBoard DI{n}** on the PDM — a canInput:
 "operand": 1, "byteOrder": 0, "factor": 1, "offset": 0, "timeoutEnabled": true,
 "timeout": 500, "mode": 0, ... }` (0x642 = 1602; byte 4 bit0 is absolute bit 32, so
 DI1→32, DI2→33). Use that slot's `CanIn{slot}Out` variable in logic.
+This `DI{n} = byte 4 bit (n-1)` mapping is confirmed against the CANBoard firmware
+(`CANBoard_FW/can.cpp` packs `DigIn1` at bit 0 … `DigIn8` at bit 7 of `data8[4]`) and
+dingoConfig (`CanboardDevice.cs`: `StartBit = 32 + index`, index 0 = first input). When
+bench-testing, sanity-check the switch wiring with `dingo listen` (watch `0x642`,
+byte 4): if IN1/IN2 read swapped, the switch is on the other terminal — a wiring
+issue, not a mapping error.
 
 To **command CANBoard DO{n}** from the PDM — a canOutput driving the bit, plus a pad
 to satisfy DLC ≥ 4:
@@ -495,9 +501,9 @@ PDM OUT1 drives the motor. Resulting PDM config (key fields):
 - `inputs[0]` (DigIn1, master): enabled, mode 0 (Momentary), pull 1 (Up), invert true.
 - `outputs[3]` (OUT4, CANBoard power): enabled, input 5 (DigIn1), currentLimit 1,
   resetMode 1 (Count), resetCountLimit 5, resetTime 1000.
-- `canInputs[0]` (CANBoard UP): id 1602, startBit 32, bitLength 1, operator 0, operand 1,
+- `canInputs[0]` (CANBoard UP, IN1): id 1602, startBit 32, bitLength 1, operator 0, operand 1,
   timeoutEnabled true, timeout 500. → CanIn1Out = var 7.
-- `canInputs[1]` (CANBoard DOWN): id 1602, startBit 33, bitLength 1, operator 0,
+- `canInputs[1]` (CANBoard DOWN, IN2): id 1602, startBit 33, bitLength 1, operator 0,
   operand 1, timeoutEnabled true, timeout 500. → CanIn2Out = var 9.
 - `virtualInputs[0]` (UP or DOWN): enabled, var0 7, cond0 1 (Or), var1 9, cond1 1,
   var2 0, mode 0. → VirtIn1 = var 71.
