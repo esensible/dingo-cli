@@ -87,7 +87,13 @@ and an unknown/misplaced flag is rejected rather than silently ignored.
 - Picks the parameter table from the document's `pdmType` (falling back to the
   number of outputs, then to dingopdm_v7), so a 4-output variant is never sent
   parameters for outputs it does not have, and a document that carries more slots
-  than the named board is rejected rather than silently truncated.
+  than the named board is rejected rather than silently truncated. A `pdmType`
+  the table does not know is an error, not a fallback.
+- Before writing, listens up to 350 ms for the node's status frame (base+2) and
+  refuses if the board type it broadcasts (byte 1 high nibble: 0 dingoPDM,
+  1 dingoPDM-Max, 2 PT-DPDM, 12 c6body_v1) differs from the config's `pdmType`.
+  A node that sends no status frame in that window is written unchecked (a note
+  says so). `-no-type-check` skips this.
 - Maps every PDM field to the firmware parameter (SDO-style) protocol —
   `{index, subindex, value}` frames — using the firmware param table; enums,
   var-map references, and floats (IEEE-754) are encoded as the firmware expects.
@@ -116,6 +122,12 @@ tests with `go test ./...`.
 - `internal/dingo` — the parameter protocol over SLCAN (`WriteAll`/`SetParam`/
   `Burn`/`Version`/…), behind a `Transport` interface for hardware-free tests.
 - `internal/slcan` — the SLCAN transport over USB CDC.
+- `internal/canframe` — the CAN frame type shared by every transport (no serial
+  dependency, so the protocol layer also builds for js/wasm).
+- `internal/ops` — the device operations (`apply`, `set`, `getn`, `verify`, …)
+  shared by the CLI and the browser build.
+- `web/` — the browser build: the same encoder and protocol compiled to
+  WebAssembly with a JavaScript-supplied transport. See `web/README.md`.
 - `fwmodel/` — **Python, not part of the Go build.** A behavioural model of the
   firmware's `CyclicUpdate()` that answers "I changed this config, does it still
   behave the same?" without hardware, by simulating two configs against a
@@ -126,13 +138,31 @@ tests with `go test ./...`.
 - `apply`/`set` change the **live** config; add `-burn` (or run `dingo burn`) to
   persist to flash.
 - `internal/params` is board-parameterised: `NewRegistry(board)` builds the exact
-  parameter set and var-map layout for dingoPDM, dingoPDM-Max, PT-DPDM or
-  CANBoard, and `apply` picks the board from the document's `pdmType`. The
-  package-level helpers (`Lookup`, `Encode`, …) still resolve against
-  **dingopdm_v7**, which is what `dingo set`/`getn` address. This matters because
+  parameter set and var-map layout for dingoPDM, dingoPDM-Max, PT-DPDM,
+  CANBoard or c6body_v1, and `apply` picks the board from the document's
+  `pdmType`. The package-level helpers (`Lookup`, `Encode`, …) still resolve
+  against **dingopdm_v7**, which is what `dingo set`/`getn` address unless given
+  `-type <pdmType>`. This matters because
   the var map is *not* portable: `VirtIn1` is 71 on dingopdm_v7 but 79 on
   pt-dpdm4_1 and 51 on canboard_v2, and v7 and Max agree on `VirtIn1` while
   diverging at `Cond1` (123 against 107).
+- **The hilux C6 body node (`c6body_v1`, `pdmType` 12)** runs the dingoFW core
+  with its own board directory (hilux `wireless-can/dingo/c6body_v1`) and is
+  configured like a PDM: a `PdmDevices` entry with `"pdmType": 12` (required),
+  default base 0x500, blocks `canInputs`/`canOutputs`/`virtualInputs`/
+  `conditions` (8) and `counters`/`flashers` (4), no outputs, digital IO or
+  keypads yet; 385 params, var map of 43 (VirtIn1 = 19). Examples:
+  `web/examples/c6-empty.json` (all defaults) and `web/examples/c6-test.json`.
+  Use `dingo set/getn -type 12` for its named params.
+
+  Its board row is checked against the firmware, not just transcribed:
+  `tools/c6oracle` builds the C6's real core (the same translation units and
+  shim as the firmware, for the host) and records its parameter table, var map,
+  and its own answers to `apply`/`verify`/`read-all` of each
+  `web/examples/c6-*.json` in `internal/params/testdata/c6body_v1.fw.json`;
+  `TestC6AgainstFirmware` and `TestC6ExamplesAgainstFirmware` compare. When the
+  C6's `port.h`/`params.h` or the vendored dingoFW change, rerun it (steps in
+  `tools/c6oracle/run.sh`) and update the board row until the tests pass.
 - Older firmware (pre-SLCAN-RX) uses a raw-byte USB protocol and a different
   bootloader command; `dingo raw` exists to drive that recovery path. Current
   firmware uses `dingo bootloader`.

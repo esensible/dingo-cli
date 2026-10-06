@@ -8,6 +8,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/hex"
 	"errors"
 	"flag"
@@ -17,8 +18,7 @@ import (
 	"time"
 
 	"dingo-cli/internal/dingo"
-	"dingo-cli/internal/params"
-	"dingo-cli/internal/pdmcfg"
+	"dingo-cli/internal/ops"
 	"dingo-cli/internal/slcan"
 )
 
@@ -139,12 +139,22 @@ func parseArgs(fs *flag.FlagSet, args []string) []string {
 	}
 }
 
+// addType adds -type: the board (pdmType) whose parameter table and var map
+// set/getn resolve names against.
+func addType(fs *flag.FlagSet) *int {
+	return fs.Int("type", 0, "board type (pdmType): 0 dingoPDM, 1 dingoPDM-Max, 2 PT-DPDM, 12 c6body_v1")
+}
+
+// typeListen is how long apply waits for the node's status frame (sent every
+// 100 ms, CAN_TX_CYCLIC_MSG_DELAY) to read its board type.
+const typeListen = 350 * time.Millisecond
+
 // maybeBurn persists to flash when -burn was given.
 func maybeBurn(cl *dingo.Client, burn bool) error {
 	if !burn {
 		return nil
 	}
-	if err := cl.Burn(); err != nil {
+	if err := ops.Burn(cl); err != nil {
 		return err
 	}
 	fmt.Println("burned to flash")
@@ -158,6 +168,8 @@ func runApply(args []string) error {
 	partial := fs.Bool("partial", false,
 		"write only the fields the file mentions, leaving the device's previous value for the rest "+
 			"(the default is to write every parameter, defaulting anything absent)")
+	noTypeCheck := fs.Bool("no-type-check", false,
+		"skip comparing the board type the node broadcasts (status frame base+2) with the config's pdmType")
 	rest := parseArgs(fs, args)
 	if len(rest) != 1 {
 		return errors.New("apply requires exactly one dingoConfig .json file argument")
@@ -166,20 +178,39 @@ func runApply(args []string) error {
 	if err != nil {
 		return err
 	}
-	cfg, err := pdmcfg.DeviceParamsOpts(data, uint16(*c.base), pdmcfg.Options{Partial: *partial})
+	cfg, err := ops.EncodeConfig(data, uint16(*c.base), *partial)
 	if err != nil {
 		return err
 	}
-	return c.client(func(cl *dingo.Client) error {
-		if err := cl.WriteAll(cfg); err != nil {
+	board, err := ops.ConfigBoard(data, uint16(*c.base))
+	if err != nil {
+		return err
+	}
+	return c.withPort(func(p *slcan.Port) error {
+		base := uint16(*c.base)
+		if !*noTypeCheck && !board.IsCanboard {
+			typ, seen := ops.BroadcastType(p, base, typeListen)
+			if !seen {
+				fmt.Printf("note: no status frame on 0x%03X within %v; board type not checked\n", base+2, typeListen)
+			} else if err := ops.CheckType(board, base, typ); err != nil {
+				return fmt.Errorf("refusing to apply: %w (-no-type-check overrides)", err)
+			}
+		}
+		cl := dingo.New(p, base)
+		res, err := ops.Apply(cl, cfg, ops.ApplyOptions{Burn: *burn, AfterWrite: func(n int) {
+			how := "every parameter on the board"
+			if *partial {
+				how = "only the fields the file sets"
+			}
+			fmt.Printf("applied %d params from %s — %s (count + CRC verified)\n", n, rest[0], how)
+		}})
+		if err != nil {
 			return err
 		}
-		how := "every parameter on the board"
-		if *partial {
-			how = "only the fields the file sets"
+		if res.Burned {
+			fmt.Println("burned to flash")
 		}
-		fmt.Printf("applied %d params from %s — %s (count + CRC verified)\n", len(cfg), rest[0], how)
-		return maybeBurn(cl, *burn)
+		return nil
 	})
 }
 
@@ -187,23 +218,25 @@ func runSet(args []string) error {
 	fs := flag.NewFlagSet("set", flag.ExitOnError)
 	c := addConn(fs)
 	burn := fs.Bool("burn", false, "burn to flash after a successful set")
+	typ := addType(fs)
 	rest := parseArgs(fs, args)
 	if len(rest) != 2 {
 		return errors.New("set requires <name> <value>")
 	}
-	d, ok := params.Lookup(rest[0])
-	if !ok {
-		return fmt.Errorf("unknown param: %s", rest[0])
+	b, err := ops.Board(*typ)
+	if err != nil {
+		return err
 	}
-	val, err := params.Encode(d, rest[1])
+	d, val, err := ops.EncodeParamFor(b, rest[0], rest[1])
 	if err != nil {
 		return err
 	}
 	return c.client(func(cl *dingo.Client) error {
-		if err := cl.SetParam(d.Index, d.Sub, val); err != nil {
+		pv, err := ops.SetFor(cl, b, d, val)
+		if err != nil {
 			return err
 		}
-		fmt.Printf("set %s = %v (index=0x%04X sub=%d value=0x%X)\n", d.Name, params.Decode(d, val), d.Index, d.Sub, val)
+		fmt.Printf("set %s = %v (index=0x%04X sub=%d value=0x%X)\n", d.Name, pv.Value, d.Index, d.Sub, pv.Raw)
 		return maybeBurn(cl, *burn)
 	})
 }
@@ -212,20 +245,25 @@ func runGetn(args []string) error {
 	fs := flag.NewFlagSet("getn", flag.ExitOnError)
 	c := addConn(fs)
 	name := fs.String("name", "", "parameter name")
+	typ := addType(fs)
 	fs.Parse(args)
 	if *name == "" {
 		return errors.New("getn requires -name")
 	}
-	d, ok := params.Lookup(*name)
-	if !ok {
-		return fmt.Errorf("unknown param: %s", *name)
+	b, err := ops.Board(*typ)
+	if err != nil {
+		return err
+	}
+	d, err := ops.ResolveParamFor(b, *name)
+	if err != nil {
+		return err
 	}
 	return c.client(func(cl *dingo.Client) error {
-		v, err := cl.ReadParam(d.Index, d.Sub)
+		pv, err := ops.GetFor(cl, b, d)
 		if err != nil {
 			return err
 		}
-		fmt.Printf("%s = %v (index=0x%04X sub=%d raw=0x%X)\n", d.Name, params.Decode(d, v), d.Index, d.Sub, v)
+		fmt.Printf("%s = %v (index=0x%04X sub=%d raw=0x%X)\n", d.Name, pv.Value, d.Index, d.Sub, pv.Raw)
 		return nil
 	})
 }
@@ -237,7 +275,7 @@ func runGet(args []string) error {
 	sub := fs.Uint("sub", 0, "param subindex")
 	fs.Parse(args)
 	return c.client(func(cl *dingo.Client) error {
-		v, err := cl.ReadParam(uint16(*idx), uint8(*sub))
+		v, err := ops.GetRaw(cl, uint16(*idx), uint8(*sub))
 		if err != nil {
 			return err
 		}
@@ -251,7 +289,7 @@ func runVerify(args []string) error {
 	c := addConn(fs)
 	fs.Parse(args)
 	return c.client(func(cl *dingo.Client) error {
-		crc, err := cl.CheckCrc()
+		crc, err := ops.Verify(cl)
 		if err != nil {
 			return err
 		}
@@ -265,11 +303,11 @@ func runVersion(args []string) error {
 	c := addConn(fs)
 	fs.Parse(args)
 	return c.client(func(cl *dingo.Client) error {
-		maj, min, bld, err := cl.Version()
+		v, err := ops.ReadVersion(cl)
 		if err != nil {
 			return err
 		}
-		fmt.Printf("firmware v%d.%d.%d\n", maj, min, bld)
+		fmt.Printf("firmware v%d.%d.%d\n", v.Major, v.Minor, v.Build)
 		return nil
 	})
 }
@@ -279,7 +317,7 @@ func runBurn(args []string) error {
 	c := addConn(fs)
 	fs.Parse(args)
 	return c.client(func(cl *dingo.Client) error {
-		if err := cl.Burn(); err != nil {
+		if err := ops.Burn(cl); err != nil {
 			return err
 		}
 		fmt.Println("burned to flash (verified)")
@@ -310,6 +348,7 @@ func runListen(args []string) error {
 	fs := flag.NewFlagSet("listen", flag.ExitOnError)
 	c := addConn(fs)
 	secs := fs.Int("secs", 6, "listen duration in seconds")
+	changes := fs.Bool("changes", false, "also print each frame whose data differs from that ID's previous frame, timestamped")
 	fs.Parse(args)
 	return c.withPort(func(p *slcan.Port) error {
 		type stat struct {
@@ -317,7 +356,8 @@ func runListen(args []string) error {
 			last  []byte
 		}
 		seen := map[uint16]*stat{}
-		deadline := time.Now().Add(time.Duration(*secs) * time.Second)
+		start := time.Now()
+		deadline := start.Add(time.Duration(*secs) * time.Second)
 		total := 0
 		for time.Now().Before(deadline) {
 			f, err := p.Recv(500 * time.Millisecond)
@@ -330,8 +370,11 @@ func runListen(args []string) error {
 				s = &stat{}
 				seen[f.ID] = s
 			}
+			if *changes && (s.count == 0 || !bytes.Equal(s.last, f.Data)) {
+				fmt.Printf("%8.3fs  id=0x%03X  %X\n", time.Since(start).Seconds(), f.ID, f.Data)
+			}
 			s.count++
-			s.last = f.Data
+			s.last = append(s.last[:0], f.Data...)
 		}
 		ids := make([]int, 0, len(seen))
 		for id := range seen {

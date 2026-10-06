@@ -196,7 +196,7 @@ func (r *Registry) buildRegistry() {
 
 	// Device config (0x0000)
 	r.addSingle("device", 0x0000, []field{
-		u(0, "baseId", TU16, 222, 0, 0x7FF),
+		u(0, "baseId", TU16, float64(bd.DefaultBaseID), 0, 0x7FF),
 		en(1, "canSpeed", "CanBitrate", 1, 0, 4),
 		b(2, "sleepEnabled", 0),
 		b(3, "canFilterEnabled", 0),

@@ -3,15 +3,16 @@ package dingo
 import (
 	"time"
 
-	"dingo-cli/internal/slcan"
+	"dingo-cli/internal/canframe"
 )
 
 // Transport is the frame-level interface the Client needs. *slcan.Port satisfies
-// it as-is; an in-memory fake satisfies it in tests, so the entire protocol layer
-// is testable without hardware.
+// it as-is (slcan.Frame is an alias of canframe.Frame); an in-memory fake
+// satisfies it in tests, and a JavaScript-supplied transport satisfies it in the
+// js/wasm build, so the protocol layer never depends on the serial port package.
 type Transport interface {
-	Send(f slcan.Frame) error
-	Recv(timeout time.Duration) (slcan.Frame, error)
+	Send(f canframe.Frame) error
+	Recv(timeout time.Duration) (canframe.Frame, error)
 	Close() error
 }
 

@@ -22,10 +22,17 @@ type Board struct {
 	Aliases []string
 	// Firmware is the dingoFW boards/<dir> this was transcribed from.
 	Firmware string
-	// PdmType is the dingoConfig "pdmType" discriminator. CANBoard is not a
-	// PdmDevice at all, so it carries -1 and IsCanboard.
+	// PdmType is the dingoConfig "pdmType" discriminator, and the board type
+	// the firmware broadcasts in the high nibble of status byte 1 (base+2,
+	// msg.cpp `GetDeviceState() + (PDM_TYPE << 4)`). CANBoard is not a
+	// PdmDevice at all and broadcasts no type, so it carries -1 and
+	// IsCanboard.
 	PdmType    int
 	IsCanboard bool
+
+	// DefaultBaseID is the board's DEFAULT_BASE_ID: the device.baseId
+	// parameter's firmware default, which a config that omits baseId gets.
+	DefaultBaseID int
 
 	Outputs      int
 	DigInputs    int
@@ -57,7 +64,7 @@ type Board struct {
 // boards is the board table. Order is the order Boards() reports them in.
 var boards = []Board{
 	{
-		Name: "dingoPDM", Firmware: "dingopdm_v7", PdmType: 0,
+		Name: "dingoPDM", Firmware: "dingopdm_v7", PdmType: 0, DefaultBaseID: 0x0DE,
 		Outputs: 8, DigInputs: 2, DigOutputs: 0, AnalogInputs: 0,
 		CanInputs: 32, CanOutputs: 32, VirtInputs: 16, Conditions: 32,
 		Counters: 4, Flashers: 4,
@@ -67,7 +74,7 @@ var boards = []Board{
 	},
 	{
 		Name: "dingoPDM-Max", Aliases: []string{"dingoPDMMax", "dingopdm-max"},
-		Firmware: "dingopdmmax_v1", PdmType: 1,
+		Firmware: "dingopdmmax_v1", PdmType: 1, DefaultBaseID: 0x0DE,
 		Outputs: 4, DigInputs: 2, DigOutputs: 0, AnalogInputs: 0,
 		CanInputs: 32, CanOutputs: 32, VirtInputs: 16, Conditions: 32,
 		Counters: 4, Flashers: 4,
@@ -77,7 +84,7 @@ var boards = []Board{
 	},
 	{
 		Name: "PT-DPDM", Aliases: []string{"PTDPDM", "pt-dpdm4"},
-		Firmware: "pt-dpdm4_1", PdmType: 2,
+		Firmware: "pt-dpdm4_1", PdmType: 2, DefaultBaseID: 0x0DE,
 		Outputs: 4, DigInputs: 2, DigOutputs: 0, AnalogInputs: 2,
 		CanInputs: 32, CanOutputs: 32, VirtInputs: 16, Conditions: 32,
 		Counters: 4, Flashers: 4,
@@ -91,8 +98,31 @@ var boards = []Board{
 		// five analog inputs. It also drops the temp sensor and battery sense,
 		// so its system var block is 3 entries, not 5.
 		Name: "CANBoard", Aliases: []string{"canboard_v2"},
-		Firmware: "canboard_v2", PdmType: -1, IsCanboard: true,
+		Firmware: "canboard_v2", PdmType: -1, IsCanboard: true, DefaultBaseID: 0x640,
 		Outputs: 0, DigInputs: 8, DigOutputs: 4, AnalogInputs: 5,
+		CanInputs: 8, CanOutputs: 8, VirtInputs: 8, Conditions: 8,
+		Counters: 4, Flashers: 4,
+		Keypads: 0, KeypadButtons: 0, KeypadDials: 0, KeypadAnalogs: 0,
+		SysVars: 3, HasWipers: false, HasStarter: false,
+		WiperSpeedMap: 0, WiperInterDelays: 0,
+	},
+	{
+		// The hilux XIAO ESP32-C6 body node (hilux wireless-can/NODE.md): the
+		// dingoFW core (vendored at wireless-can/dingo/dingoFW, v0.5.8) built
+		// with the board directory wireless-can/dingo/c6body_v1, not a dingoFW
+		// boards/ entry. CANBoard-sized logic and, so far, no local IO at all
+		// (milestone 3 adds digital inputs and outputs, milestone 4 keypads;
+		// each changes the param table AND shifts the var map, so this row
+		// must change with that port.h). It broadcasts its type like a PDM
+		// (PDM_TYPE 0xC), so its config is a PdmDevices entry with pdmType 12.
+		//
+		// Checked against the firmware itself, not just transcribed:
+		// testdata/c6body_v1.fw.json is the real core built for the host by
+		// tools/c6oracle (param table, var map, and apply/verify/read-back of
+		// web/examples/c6-*.json), and TestC6AgainstFirmware compares.
+		Name: "c6body_v1", Aliases: []string{"C6", "c6body"},
+		Firmware: "hilux wireless-can/dingo/c6body_v1", PdmType: 12, DefaultBaseID: 0x500,
+		Outputs: 0, DigInputs: 0, DigOutputs: 0, AnalogInputs: 0,
 		CanInputs: 8, CanOutputs: 8, VirtInputs: 8, Conditions: 8,
 		Counters: 4, Flashers: 4,
 		Keypads: 0, KeypadButtons: 0, KeypadDials: 0, KeypadAnalogs: 0,

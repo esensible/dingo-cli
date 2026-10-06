@@ -17,16 +17,16 @@ import (
 	"time"
 
 	"go.bug.st/serial"
+
+	"dingo-cli/internal/canframe"
 )
 
 // ErrTimeout is returned by Recv when no frame arrives before the deadline.
 var ErrTimeout = errors.New("slcan: receive timeout")
 
-// Frame is a classic 11-bit CAN frame.
-type Frame struct {
-	ID   uint16
-	Data []byte // 0..8 bytes
-}
+// Frame is a classic 11-bit CAN frame. It is an alias of canframe.Frame so the
+// protocol layer can name frames without depending on the serial port package.
+type Frame = canframe.Frame
 
 // Port is an open SLCAN connection.
 type Port struct {

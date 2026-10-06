@@ -1,10 +1,15 @@
 package dingo
 
 import (
+	"errors"
 	"time"
 
-	"dingo-cli/internal/slcan"
+	"dingo-cli/internal/canframe"
 )
+
+// errFakeTimeout is the fake's Recv timeout (the Client treats any Recv error
+// as "nothing arrived").
+var errFakeTimeout = errors.New("fake: receive timeout")
 
 // fakeClock is a deterministic clock: time only advances when the code sleeps or
 // when a Recv times out (modeled by fakeDevice.Recv). No real wall-time passes.
@@ -27,7 +32,7 @@ type fakeDevice struct {
 	staged  []Param
 	burned  bool
 	version uint32
-	rx      []slcan.Frame // FIFO of queued responses
+	rx      []canframe.Frame // FIFO of queued responses
 
 	// fault injection
 	dropFirst   int              // swallow the first N inbound commands (no processing/reply)
@@ -46,7 +51,7 @@ func newFake(base uint16) *fakeDevice {
 func key(index uint16, sub uint8) uint32 { return uint32(index)<<8 | uint32(sub) }
 
 func (d *fakeDevice) reply(cmd uint8, idx uint16, sub uint8, val uint32) {
-	d.rx = append(d.rx, slcan.Frame{ID: d.base + configTxOffset, Data: frameBytes(cmd, idx, sub, val)})
+	d.rx = append(d.rx, canframe.Frame{ID: d.base + configTxOffset, Data: frameBytes(cmd, idx, sub, val)})
 }
 
 func (d *fakeDevice) commit() {
@@ -56,7 +61,7 @@ func (d *fakeDevice) commit() {
 	}
 }
 
-func (d *fakeDevice) Send(f slcan.Frame) error {
+func (d *fakeDevice) Send(f canframe.Frame) error {
 	if d.dropFirst > 0 {
 		d.dropFirst--
 		return nil // device was busy: command lost, no reply
@@ -112,10 +117,10 @@ func (d *fakeDevice) Send(f slcan.Frame) error {
 	return nil
 }
 
-func (d *fakeDevice) Recv(timeout time.Duration) (slcan.Frame, error) {
+func (d *fakeDevice) Recv(timeout time.Duration) (canframe.Frame, error) {
 	if len(d.rx) == 0 {
 		d.clock.Sleep(timeout) // a Recv timeout consumes wall-time
-		return slcan.Frame{}, slcan.ErrTimeout
+		return canframe.Frame{}, errFakeTimeout
 	}
 	f := d.rx[0]
 	d.rx = d.rx[1:]

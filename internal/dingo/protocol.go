@@ -18,7 +18,7 @@ import (
 	"hash/crc32"
 	"time"
 
-	"dingo-cli/internal/slcan"
+	"dingo-cli/internal/canframe"
 )
 
 // MsgCmd values (firmware core/enums.h).
@@ -77,6 +77,13 @@ type Client struct {
 	port  Transport
 	base  uint16
 	clock Clock
+	scale float64 // response-timeout multiplier; 0 means 1 (see SetTimeoutScale)
+
+	// Progress, when non-nil, is called as WriteAll sends each param
+	// (done, total) and as ReadAll receives each param (done, 0: the device
+	// does not announce the dump size up front). It runs on the calling
+	// goroutine and must not block. It has no effect on the wire.
+	Progress func(done, total int)
 }
 
 // New wraps a transport (an open SLCAN port in production, a fake in tests).
@@ -84,10 +91,35 @@ func New(port Transport, base uint16) *Client {
 	return &Client{port: port, base: base, clock: realClock{}}
 }
 
+// SetTimeoutScale multiplies every response timeout (request/burn/read-all
+// windows, not the write pacing) by f. It exists only so tests of a real-time
+// transport (the js/wasm build's Node tests) can exercise the timeout paths
+// quickly; the CLI never calls it, so production timing is the constants above.
+func (c *Client) SetTimeoutScale(f float64) { c.scale = f }
+
+// d applies the timeout scale.
+func (c *Client) d(x time.Duration) time.Duration {
+	if c.scale <= 0 || c.scale == 1 {
+		return x
+	}
+	return time.Duration(float64(x) * c.scale)
+}
+
+func (c *Client) progress(done, total int) {
+	if c.Progress != nil {
+		c.Progress(done, total)
+	}
+}
+
+// CRC is the config CRC the device reports for a param set (count + CRC are
+// what WriteAll/ReadAll verify): CRC-32/IEEE over each value, little-endian, in
+// order.
+func CRC(params []Param) uint32 { return crcOf(params) }
+
 func (c *Client) Close() error { return c.port.Close() }
 
 func (c *Client) sendBytes(d []byte) error {
-	return c.port.Send(slcan.Frame{ID: c.base + configRxOffset, Data: d})
+	return c.port.Send(canframe.Frame{ID: c.base + configRxOffset, Data: d})
 }
 
 func frameBytes(cmd uint8, index uint16, sub uint8, val uint32) []byte {
@@ -103,7 +135,7 @@ func (c *Client) send(cmd uint8, index uint16, sub uint8, val uint32) error {
 	return c.sendBytes(frameBytes(cmd, index, sub, val))
 }
 
-func decode(f slcan.Frame) msg {
+func decode(f canframe.Frame) msg {
 	return msg{
 		Cmd:      f.Data[0],
 		Index:    binary.LittleEndian.Uint16(f.Data[1:3]),
@@ -136,7 +168,7 @@ func (c *Client) requestBytes(d []byte, wantCmd uint8) (msg, error) {
 		if err := c.sendBytes(d); err != nil {
 			return msg{}, err
 		}
-		deadline := c.clock.Now().Add(requestTimeout)
+		deadline := c.clock.Now().Add(c.d(requestTimeout))
 		for {
 			m, ok := c.recvResp(deadline)
 			if !ok {
@@ -186,18 +218,18 @@ func (c *Client) ReadAll() ([]Param, error) {
 	var out []Param
 	primed := false
 	var lastSend, lastRsp time.Time
-	deadline := c.clock.Now().Add(readAllOverall)
+	deadline := c.clock.Now().Add(c.d(readAllOverall))
 
 	for c.clock.Now().Before(deadline) {
-		if !primed && c.clock.Since(lastSend) > readAllResend {
+		if !primed && c.clock.Since(lastSend) > c.d(readAllResend) {
 			if err := c.send(cmdReadAll, 0, 0, 0); err != nil {
 				return nil, err
 			}
 			lastSend = c.clock.Now()
 		}
-		m, ok := c.recvResp(c.clock.Now().Add(readAllPoll))
+		m, ok := c.recvResp(c.clock.Now().Add(c.d(readAllPoll)))
 		if !ok {
-			if primed && c.clock.Since(lastRsp) > readAllQuiet {
+			if primed && c.clock.Since(lastRsp) > c.d(readAllQuiet) {
 				break // dump finished (completion marker may have been dropped)
 			}
 			continue
@@ -208,6 +240,7 @@ func (c *Client) ReadAll() ([]Param, error) {
 			lastRsp = c.clock.Now()
 			if m.Cmd == cmdReadAllRsp {
 				out = append(out, Param{Index: m.Index, SubIndex: m.SubIndex, Value: m.Value})
+				c.progress(len(out), 0)
 			}
 		case cmdReadAllComplete:
 			if int(m.Index) != len(out) {
@@ -245,6 +278,7 @@ func (c *Client) WriteAll(params []Param) error {
 		if err := c.send(cmdWriteAllVal, p.Index, p.SubIndex, p.Value); err != nil {
 			return err
 		}
+		c.progress(i+1, len(params))
 		if (i+1)%writeBatchSize == 0 {
 			c.clock.Sleep(writeBatchPause) // pace batches as the firmware does
 		}
@@ -275,7 +309,7 @@ func (c *Client) CheckCrc() (uint32, error) {
 // firmware requires the magic payload [30,1,3,8] and replies with WriteConfig()'s
 // result in byte 4 (1 = success). Sent single-shot: a resend would re-flash.
 func (c *Client) Burn() error {
-	resp, err := c.requestOnce([]byte{cmdBurnSettings, 1, 3, 8, 0, 0, 0, 0}, cmdBurnSettings, burnTimeout)
+	resp, err := c.requestOnce([]byte{cmdBurnSettings, 1, 3, 8, 0, 0, 0, 0}, cmdBurnSettings, c.d(burnTimeout))
 	if err != nil {
 		return err
 	}

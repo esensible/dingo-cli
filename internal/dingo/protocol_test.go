@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"dingo-cli/internal/slcan"
+	"dingo-cli/internal/canframe"
 )
 
 const testBase = 0x0DE
@@ -18,7 +18,7 @@ func TestFrameRoundTrip(t *testing.T) {
 		{cmdWriteAllComplete, 2269, 0, 0xDEADBEEF},
 	}
 	for _, want := range cases {
-		got := decode(slcan.Frame{Data: frameBytes(want.Cmd, want.Index, want.SubIndex, want.Value)})
+		got := decode(canframe.Frame{Data: frameBytes(want.Cmd, want.Index, want.SubIndex, want.Value)})
 		if got != want {
 			t.Errorf("round-trip: got %+v want %+v", got, want)
 		}

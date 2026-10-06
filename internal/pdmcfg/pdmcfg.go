@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"strings"
 
 	"dingo-cli/internal/dingo"
 	"dingo-cli/internal/params"
@@ -102,6 +103,44 @@ var dialFields = []fieldMap{
 	{"enabled", 0}, {"minCount", 1}, {"maxCount", 2}, {"ledOffset", 3},
 }
 
+// Field is one scalar dingoConfig JSON field of a function block and the
+// firmware subindex it is written to.
+type Field struct {
+	JSON string
+	Sub  uint8
+}
+
+// BlockFields returns the scalar JSON fields this package encodes for a
+// function block, by the block's dingoConfig key ("outputs", "inputs",
+// "canInputs", "canOutputs", "virtualInputs", "conditions", "counters",
+// "flashers", "wipers", "starterDisable", "keypads"), and the firmware index of
+// its first instance (instance n, 1-based, is at base+n-1). Array fields
+// (speedMap, intermitTime, outputsDisabled, keypad buttons and dials) are not
+// listed. ok is false for a key this package does not encode.
+func BlockFields(key string) (base uint16, fields []Field, ok bool) {
+	conv := func(fm []fieldMap) []Field {
+		out := make([]Field, len(fm))
+		for i, f := range fm {
+			out[i] = Field{JSON: f.json, Sub: f.sub}
+		}
+		return out
+	}
+	for _, g := range instGroups {
+		if g.key == key {
+			return g.base, conv(g.fields), true
+		}
+	}
+	switch key {
+	case "wipers":
+		return 0x1900, conv(wiperFields), true
+	case "starterDisable":
+		return 0x1800, []Field{{"enabled", 0}, {"input", 1}}, true
+	case "keypads":
+		return 0x3000, conv(keypadFields), true
+	}
+	return 0, nil, false
+}
+
 type configFile struct {
 	PdmDevices []json.RawMessage `json:"PdmDevices"`
 }
@@ -127,6 +166,26 @@ func DeviceParams(data []byte, target uint16) ([]dingo.Param, error) {
 
 // DeviceParamsOpts is DeviceParams with explicit options.
 func DeviceParamsOpts(data []byte, target uint16, opt Options) ([]dingo.Param, error) {
+	chosen, err := selectDevice(data, target)
+	if err != nil {
+		return nil, err
+	}
+	return project(chosen, opt)
+}
+
+// DeviceBoard reports the board (parameter table) DeviceParams projects the
+// selected PDM against, using the same selection and pdmType/outputs rules.
+func DeviceBoard(data []byte, target uint16) (params.Board, error) {
+	chosen, err := selectDevice(data, target)
+	if err != nil {
+		return params.Board{}, err
+	}
+	return boardOf(chosen)
+}
+
+// selectDevice picks the PdmDevices entry whose baseId matches target, or the
+// only entry if there is just one.
+func selectDevice(data []byte, target uint16) (map[string]json.RawMessage, error) {
 	var f configFile
 	if err := json.Unmarshal(data, &f); err != nil {
 		return nil, fmt.Errorf("parse dingoConfig file: %w", err)
@@ -158,37 +217,49 @@ func DeviceParamsOpts(data []byte, target uint16, opt Options) ([]dingo.Param, e
 			return nil, fmt.Errorf("no PDM with baseId %d in file (have %v); use -base to pick one", target, ids)
 		}
 	}
-	return project(chosen, opt)
+	return chosen, nil
 }
 
 // boardOf picks the parameter table to project against.
 //
 // pdmType is authoritative when present — it is the discriminator the GUI
-// writes. Failing that, the number of outputs identifies the variant well
-// enough (8 for a dingoPDM, 4 for a Max or PT-DPDM), and a document that
-// matches nothing falls back to the board this CLI has always assumed.
-func boardOf(m map[string]json.RawMessage) params.Board {
-	if raw, ok := m["pdmType"]; ok {
+// writes (and the type the device broadcasts). A pdmType this table does not
+// know is an error, never a fallback: projecting a c6body_v1 document (12)
+// against the dingoPDM table would encode a different device's parameters.
+// Without pdmType, the number of outputs identifies the variant well enough
+// (8 for a dingoPDM, 4 for a Max or PT-DPDM), and a document that matches
+// nothing falls back to the board this CLI has always assumed. A board with
+// no outputs at all (c6body_v1) is never inferred: its documents must say
+// pdmType.
+func boardOf(m map[string]json.RawMessage) (params.Board, error) {
+	if raw, ok := m["pdmType"]; ok && string(raw) != "null" {
 		var t int
-		if json.Unmarshal(raw, &t) == nil {
-			for _, b := range params.Boards() {
-				if !b.IsCanboard && b.PdmType == t {
-					return b
-				}
-			}
+		if err := json.Unmarshal(raw, &t); err != nil {
+			return params.Board{}, fmt.Errorf("pdmType %s is not an integer", raw)
 		}
+		var valid []string
+		for _, b := range params.Boards() {
+			if b.IsCanboard {
+				continue
+			}
+			if b.PdmType == t {
+				return b, nil
+			}
+			valid = append(valid, fmt.Sprintf("%d (%s)", b.PdmType, b.Name))
+		}
+		return params.Board{}, fmt.Errorf("unknown pdmType %d (valid: %s)", t, strings.Join(valid, ", "))
 	}
 	if raw, ok := m["outputs"]; ok {
 		var arr []json.RawMessage
 		if json.Unmarshal(raw, &arr) == nil {
 			for _, b := range params.Boards() {
-				if !b.IsCanboard && b.Outputs == len(arr) {
-					return b
+				if !b.IsCanboard && b.Outputs > 0 && b.Outputs == len(arr) {
+					return b, nil
 				}
 			}
 		}
 	}
-	return params.DefaultBoard()
+	return params.DefaultBoard(), nil
 }
 
 // values is every scalar the document supplies, keyed by index<<8|sub.
@@ -197,7 +268,10 @@ type values map[uint32]interface{}
 func key(index uint16, sub uint8) uint32 { return uint32(index)<<8 | uint32(sub) }
 
 func project(m map[string]json.RawMessage, opt Options) ([]dingo.Param, error) {
-	board := boardOf(m)
+	board, err := boardOf(m)
+	if err != nil {
+		return nil, err
+	}
 	reg := params.NewRegistry(board)
 
 	vals := values{}
