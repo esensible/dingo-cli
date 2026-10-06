@@ -3,6 +3,7 @@
 /web/dingo.wasm
 /web/wasm_exec.js
 /web/flow-editor/
+/tools/canflood/canflood
 *.tmp
 .DS_Store
 __pycache__/
