@@ -38,6 +38,7 @@
 #include "device.h"
 #include "config.h"
 #include "param_registry.h"
+#include "hw_devices.h"
 
 // ---- what the Rust side provides on the C6 ---------------------------------
 
@@ -92,6 +93,9 @@ bool dingo_can_rx_pending(void) { return !rxq.empty(); }
 void dingo_fatal_error(uint8_t err, uint8_t src) { fatal = err * 256 + src; }
 uint32_t dingo_sys_time_ms(void) { return now_ms; }
 void dingo_sleep_us(uint32_t) {}
+// The digital input pins (hilux src/dingo.rs): no pins here, every line low.
+bool dingo_gpio_read(uint32_t) { return false; }
+void dingo_gpio_set_mode(uint32_t, uint32_t) {}
 
 uint32_t core_config_blob_len(void);
 uint32_t core_config_serialize(uint8_t *out, uint32_t cap);
@@ -184,6 +188,10 @@ static std::string varName(int i)
 {
     const float *p = pVarMap[i];
     char b[48];
+#if NUM_DIG_INPUTS > 0
+    for (int k = 0; k < NUM_DIG_INPUTS; k++)
+        if (p == &digIn[k].fVal) { snprintf(b, sizeof b, "DigIn%d", k + 1); return b; }
+#endif
     for (int k = 0; k < NUM_CAN_INPUTS; k++)
     {
         if (p == &canIn[k].fOutput) { snprintf(b, sizeof b, "CanIn%dOut", k + 1); return b; }

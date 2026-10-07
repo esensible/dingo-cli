@@ -147,8 +147,8 @@ func TestC6Projection(t *testing.T) {
 		got[d.Name] = p.Value
 	}
 	for name, want := range map[string]uint32{
-		"canInput[1].id": 1521, "condition[1].input": 3, "counter[1].incInput": 31,
-		"counter[1].maxCount": 3, "flasher[4].input": 39, "flasher[4].enabled": 1, "device.baseId": 1280,
+		"canInput[1].id": 1521, "condition[1].input": 5, "counter[1].incInput": 33,
+		"counter[1].maxCount": 3, "flasher[4].input": 41, "flasher[4].enabled": 1, "device.baseId": 1280,
 	} {
 		if got[name] != want {
 			t.Errorf("%s = %d, want %d", name, got[name], want)
@@ -157,12 +157,12 @@ func TestC6Projection(t *testing.T) {
 
 	for _, c := range []struct{ dev, want string }{
 		{`{"pdmType":12,"outputs":[{"enabled":true}]}`, "no firmware param for index 0x1000"},
-		{`{"pdmType":12,"inputs":[{"enabled":true}]}`, "no firmware param for index 0x1200"},
+		{`{"pdmType":12,"inputs":[{},{},{"enabled":true}]}`, "no firmware param for index 0x1202"},
 		{`{"pdmType":12,"canInputs":[{},{},{},{},{},{},{},{},{"enabled":true}]}`, "no firmware param for index 0x1308"},
 		{`{"pdmType":12,"keypads":[{"enabled":true}]}`, "no firmware param for index 0x3000"},
 		{`{"pdmType":12,"wipers":{"enabled":true}}`, "no firmware param for index 0x1900"},
 		{`{"pdmType":12,"virtualInputs":[{"var0":"Out1Active"}]}`, `unknown variable "Out1Active"`},
-		{`{"pdmType":12,"virtualInputs":[{"var0":43}]}`, "var-map index 43 out of range (0..42)"},
+		{`{"pdmType":12,"virtualInputs":[{"var0":45}]}`, "var-map index 45 out of range (0..44)"},
 		{`{"pdmType":13}`, "unknown pdmType 13 (valid: 0 (dingoPDM), 1 (dingoPDM-Max), 2 (PT-DPDM), 12 (c6body_v1))"},
 		{`{"pdmType":"12"}`, "pdmType \"12\" is not an integer"},
 	} {

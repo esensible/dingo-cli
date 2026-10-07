@@ -10,7 +10,7 @@
       "bitrate": 1,
       "virtualInputs": [
         {
-          "name": "always-on (VirtIn1 = var 19)",
+          "name": "always-on (VirtIn1 = var 21)",
           "number": 1,
           "enabled": true,
           "not0": false,
@@ -26,10 +26,10 @@
       ],
       "flashers": [
         {
-          "name": "blink-1hz (Flasher1 = var 27)",
+          "name": "blink-1hz (Flasher1 = var 29)",
           "number": 1,
           "enabled": true,
-          "input": 19,
+          "input": 21,
           "onTime": 500,
           "offTime": 500,
           "single": false
@@ -40,7 +40,7 @@
           "name": "virtin1 -> 0x5F0 byte 0",
           "number": 1,
           "enabled": true,
-          "input": 19,
+          "input": 21,
           "ide": false,
           "id": 1520,
           "startBit": 0,
@@ -55,7 +55,7 @@
           "name": "flasher1 -> 0x5F0 byte 1",
           "number": 2,
           "enabled": true,
-          "input": 27,
+          "input": 29,
           "ide": false,
           "id": 1520,
           "startBit": 8,

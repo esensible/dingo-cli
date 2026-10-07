@@ -55,7 +55,7 @@ func TestCheckType(t *testing.T) {
 // PDM config, and c6-empty verifies as the firmware's defaults CRC
 // (params/testdata/c6body_v1.fw.json, from the real core).
 func TestC6ApplyVerify(t *testing.T) {
-	for name, want := range map[string]string{"c6-empty": "19879C6B", "c6-test": "C1E4D8D1"} {
+	for name, want := range map[string]string{"c6-empty": "DDEC393D", "c6-test": "C50D86DA"} {
 		data, err := os.ReadFile("../../web/examples/" + name + ".json")
 		if err != nil {
 			t.Fatal(err)
@@ -74,14 +74,14 @@ func TestC6ApplyVerify(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if res.Applied != 385 || fmt.Sprintf("%08X", res.CRC) != want {
-			t.Fatalf("%s: applied %d crc %08X, want 385 %s", name, res.Applied, res.CRC, want)
+		if res.Applied != 395 || fmt.Sprintf("%08X", res.CRC) != want {
+			t.Fatalf("%s: applied %d crc %08X, want 395 %s", name, res.Applied, res.CRC, want)
 		}
 		if crc, err := Verify(cl); err != nil || crc != res.CRC {
 			t.Fatalf("%s: verify %08X, %v", name, crc, err)
 		}
 		ps, crc, err := ReadAll(cl)
-		if err != nil || len(ps) != 385 || crc != res.CRC {
+		if err != nil || len(ps) != 395 || crc != res.CRC {
 			t.Fatalf("%s: read-all %d params %08X, %v", name, len(ps), crc, err)
 		}
 	}

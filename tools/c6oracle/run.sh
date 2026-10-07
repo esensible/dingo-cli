@@ -27,7 +27,7 @@ mkdir -p "$BUILD" "$(dirname "$OUT")"
 FW="core/device.cpp core/config_handler.cpp core/param_protocol.cpp core/param_registry.cpp
  core/status.cpp comms/infomsg.cpp comms/request_msg.cpp functions/can_input.cpp
  functions/can_outputs.cpp functions/condition.cpp functions/counter.cpp
- functions/flasher.cpp functions/input.cpp functions/virtual_input.cpp utils/crc.cpp
+ functions/digital_input.cpp functions/flasher.cpp functions/input.cpp functions/virtual_input.cpp utils/crc.cpp
  utils/dbc.cpp"
 SRC=""
 for s in $FW; do SRC="$SRC $D/dingoFW/$s"; done

@@ -110,10 +110,10 @@ var boards = []Board{
 		// The hilux XIAO ESP32-C6 body node (hilux wireless-can/NODE.md): the
 		// dingoFW core (vendored at wireless-can/dingo/dingoFW, v0.5.8) built
 		// with the board directory wireless-can/dingo/c6body_v1, not a dingoFW
-		// boards/ entry. CANBoard-sized logic and, so far, no local IO at all
-		// (milestone 3 adds digital inputs and outputs, milestone 4 keypads;
-		// each changes the param table AND shifts the var map, so this row
-		// must change with that port.h). It broadcasts its type like a PDM
+		// boards/ entry. CANBoard-sized logic; local IO so far is two digital
+		// inputs, D0 and D1 (digital outputs and keypads come later; each
+		// changes the param table AND shifts the var map, so this row must
+		// change with that port.h). It broadcasts its type like a PDM
 		// (PDM_TYPE 0xC), so its config is a PdmDevices entry with pdmType 12.
 		//
 		// Checked against the firmware itself, not just transcribed:
@@ -122,7 +122,7 @@ var boards = []Board{
 		// web/examples/c6-*.json), and TestC6AgainstFirmware compares.
 		Name: "c6body_v1", Aliases: []string{"C6", "c6body"},
 		Firmware: "hilux wireless-can/dingo/c6body_v1", PdmType: 12, DefaultBaseID: 0x500,
-		Outputs: 0, DigInputs: 0, DigOutputs: 0, AnalogInputs: 0,
+		Outputs: 0, DigInputs: 2, DigOutputs: 0, AnalogInputs: 0,
 		CanInputs: 8, CanOutputs: 8, VirtInputs: 8, Conditions: 8,
 		Counters: 4, Flashers: 4,
 		Keypads: 0, KeypadButtons: 0, KeypadDials: 0, KeypadAnalogs: 0,

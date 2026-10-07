@@ -121,9 +121,9 @@ func TestC6Graph(t *testing.T) {
 	wantEdges := map[string]string{
 		"virtualInput-1:var0": "device/out:1", // AlwaysTrue
 		"virtualInput-1:var1": "device/out:1",
-		"flasher-1:input":     "virtualInput-1/out:19",
-		"canOutput-1:input":   "virtualInput-1/out:19",
-		"canOutput-2:input":   "flasher-1/out:27",
+		"flasher-1:input":     "virtualInput-1/out:21",
+		"canOutput-1:input":   "virtualInput-1/out:21",
+		"canOutput-2:input":   "flasher-1/out:29",
 	}
 	got := edgeSet(v.Graph)
 	if len(got) != len(wantEdges) {
@@ -143,8 +143,8 @@ func TestC6Graph(t *testing.T) {
 		t.Errorf("device outputs %+v", dev.Outputs)
 	}
 	fl := findNode(v.Graph, "flasher-1")
-	if fl.Label != "blink-1hz (Flasher1 = var 27)" || fl.Subtitle != "Flasher 1" || fl.Category != "Logic" ||
-		len(fl.Outputs) != 1 || *fl.Outputs[0].Var != "27" || !fl.Outputs[0].Connected || !fl.Inputs[0].Connected {
+	if fl.Label != "blink-1hz (Flasher1 = var 29)" || fl.Subtitle != "Flasher 1" || fl.Category != "Logic" ||
+		len(fl.Outputs) != 1 || *fl.Outputs[0].Var != "29" || !fl.Outputs[0].Connected || !fl.Inputs[0].Connected {
 		t.Errorf("flasher node %+v", fl)
 	}
 	// Default layout: columns by category, stacked.
@@ -154,8 +154,8 @@ func TestC6Graph(t *testing.T) {
 	if co := findNode(v.Graph, "canOutput-2"); co.X != 720 || co.Y <= 0 {
 		t.Errorf("canOutput-2 at %v,%v", co.X, co.Y)
 	}
-	// 8+8+8+8+4+4 slots, two of them on the canvas besides the device.
-	if len(v.Slots) != 40 {
+	// 2+8+8+8+8+4+4 slots, two of them on the canvas besides the device.
+	if len(v.Slots) != 42 {
 		t.Errorf("%d slots", len(v.Slots))
 	}
 }
@@ -207,11 +207,11 @@ func TestBenchToggleGraph(t *testing.T) {
 // that changes in the encoding.
 func TestConnect(t *testing.T) {
 	data := example(t, "c6-test.json")
-	r := edit(t, data, EditReq{Op: "connect", Source: "flasher-1", SourceHandle: "out:27", Target: "virtualInput-1", TargetHandle: "in:var2"})
-	if got := elem(t, device(t, r.Config), "virtualInputs", 0)["var2"]; got != 27.0 {
-		t.Fatalf("var2 = %v, want 27", got)
+	r := edit(t, data, EditReq{Op: "connect", Source: "flasher-1", SourceHandle: "out:29", Target: "virtualInput-1", TargetHandle: "in:var2"})
+	if got := elem(t, device(t, r.Config), "virtualInputs", 0)["var2"]; got != 29.0 {
+		t.Fatalf("var2 = %v, want 29", got)
 	}
-	if edgeSet(r.Graph)["virtualInput-1:var2"] != "flasher-1/out:27" {
+	if edgeSet(r.Graph)["virtualInput-1:var2"] != "flasher-1/out:29" {
 		t.Errorf("no edge: %v", edgeSet(r.Graph))
 	}
 	if r.CRC == crcOf(t, data, 0x500) || r.CRC != crcOf(t, []byte(r.Config), 0x500) || !r.Changed {
@@ -244,14 +244,14 @@ func mustBoard(t *testing.T, pdmType int) params.Board {
 // the slots before it) as disabled defaults; the projection still encodes.
 func TestConnectCreatesSlot(t *testing.T) {
 	data := example(t, "c6-test.json")
-	r := edit(t, data, EditReq{Op: "connect", SourceHandle: "out:27", Target: "condition-3", TargetHandle: "in:input"})
+	r := edit(t, data, EditReq{Op: "connect", SourceHandle: "out:29", Target: "condition-3", TargetHandle: "in:input"})
 	dev := device(t, r.Config)
 	conds := dev["conditions"].([]any)
 	if len(conds) != 3 {
 		t.Fatalf("conditions: %v", conds)
 	}
 	c3 := conds[2].(map[string]any)
-	if c3["input"] != 27.0 || c3["enabled"] != false || c3["name"] != "condition3" || c3["number"] != 3.0 {
+	if c3["input"] != 29.0 || c3["enabled"] != false || c3["name"] != "condition3" || c3["number"] != 3.0 {
 		t.Errorf("condition 3: %v", c3)
 	}
 	// condition-3 is disabled, so it is not a node and the wire is not drawn.
@@ -262,7 +262,7 @@ func TestConnectCreatesSlot(t *testing.T) {
 	if n := findNode(r2.Graph, "condition-3"); n == nil || n.X != 500 || n.Y != 600 || !n.Enabled {
 		t.Fatalf("added condition-3: %+v", n)
 	}
-	if edgeSet(r2.Graph)["condition-3:input"] != "flasher-1/out:27" {
+	if edgeSet(r2.Graph)["condition-3:input"] != "flasher-1/out:29" {
 		t.Errorf("edges %v", edgeSet(r2.Graph))
 	}
 }
@@ -278,9 +278,9 @@ func TestTypeMismatchRejected(t *testing.T) {
 		want string
 	}{
 		// CanIn1Val (float) into a flasher's bool input.
-		{EditReq{Op: "connect", SourceHandle: "out:4", Target: "flasher-1", TargetHandle: "in:input"}, "Input accepts bool, not float"},
+		{EditReq{Op: "connect", SourceHandle: "out:6", Target: "flasher-1", TargetHandle: "in:input"}, "Input accepts bool, not float"},
 		// Counter1 value (int) into a virtual input.
-		{EditReq{Op: "connect", SourceHandle: "out:39", Target: "virtualInput-1", TargetHandle: "in:var0"}, "Var 0 accepts bool, not int"},
+		{EditReq{Op: "connect", SourceHandle: "out:41", Target: "virtualInput-1", TargetHandle: "in:var0"}, "Var 0 accepts bool, not int"},
 		// State (int) into a counter's increment.
 		{EditReq{Op: "connect", SourceHandle: "out:2", Target: "counter-1", TargetHandle: "in:incInput"}, "Increment accepts bool, not int"},
 		{EditReq{Op: "connect", SourceHandle: "out:99", Target: "flasher-1", TargetHandle: "in:input"}, "unknown source variable"},
@@ -293,7 +293,7 @@ func TestTypeMismatchRejected(t *testing.T) {
 	}
 	// Any-typed inputs take every type: a float into a CAN output and a condition.
 	for _, target := range []string{"canOutput-1", "condition-1"} {
-		edit(t, data, EditReq{Op: "connect", SourceHandle: "out:4", Target: target, TargetHandle: "in:input"})
+		edit(t, data, EditReq{Op: "connect", SourceHandle: "out:6", Target: target, TargetHandle: "in:input"})
 	}
 	// dingoPDM: a float current into an output's duty cycle (int/float) is fine, into its bool input not.
 	bt := example(t, "bench-toggle.json")
@@ -327,7 +327,7 @@ func TestDelete(t *testing.T) {
 	if elem(t, dev, "flashers", 0)["input"] != 0.0 || elem(t, dev, "canOutputs", 0)["input"] != 0.0 {
 		t.Errorf("users not disconnected: %v", dev)
 	}
-	if elem(t, dev, "canOutputs", 1)["input"] != 27.0 {
+	if elem(t, dev, "canOutputs", 1)["input"] != 29.0 {
 		t.Error("an unrelated input was cleared")
 	}
 	if findNode(r.Graph, "virtualInput-1") != nil {
@@ -356,7 +356,7 @@ func TestDisabledSourceShown(t *testing.T) {
 	if n == nil || n.Enabled {
 		t.Fatalf("flasher-1: %+v", n)
 	}
-	if edgeSet(r.Graph)["canOutput-2:input"] != "flasher-1/out:27" {
+	if edgeSet(r.Graph)["canOutput-2:input"] != "flasher-1/out:29" {
 		t.Error("wire from the disabled flasher hidden")
 	}
 }
@@ -485,7 +485,7 @@ func TestVarNamesRead(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if edgeSet(v.Graph)["flasher-1:input"] != "canInput-1/out:3" {
+	if edgeSet(v.Graph)["flasher-1:input"] != "canInput-1/out:5" {
 		t.Errorf("edges %v", edgeSet(v.Graph))
 	}
 }
