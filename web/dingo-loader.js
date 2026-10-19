@@ -9,7 +9,42 @@
 // return the same instance. Unlike the dingo.* operations, loadDingo rejects
 // (throws) if the module cannot be loaded, since there is no dingo to report to.
 
+import { createTimers } from "./timers.js";
+
 let loading = null;
+
+/**
+ * The Go runtime's timers (time.Sleep, timeouts) on `timers` instead of the
+ * page's setTimeout, which a hidden tab coarsens to up to ~1 s (timers.js):
+ * the protocol's pacing (WriteAll's 8 ms pauses) and its timeouts keep time
+ * in a background tab. Same logic as wasm_exec.js's own
+ * runtime.scheduleTimeoutEvent / clearTimeoutEvent (Go 1.22), which this
+ * replaces in the import object; wasm_exec.js itself stays Go's file.
+ */
+function useTimers(go, timers) {
+  const gojs = go.importObject.gojs;
+  const getInt64 = (addr) => go.mem.getUint32(addr, true) + go.mem.getInt32(addr + 4, true) * 4294967296;
+  gojs["runtime.scheduleTimeoutEvent"] = (sp) => {
+    sp >>>= 0;
+    const id = go._nextCallbackTimeoutID;
+    go._nextCallbackTimeoutID++;
+    go._scheduledTimeouts.set(id, timers.setTimeout(() => {
+      go._resume();
+      while (go._scheduledTimeouts.has(id)) {
+        // as wasm_exec.js: https://github.com/golang/go/issues/28975
+        console.warn("scheduleTimeoutEvent: missed timeout event");
+        go._resume();
+      }
+    }, getInt64(sp + 8)));
+    go.mem.setInt32(sp + 16, id, true);
+  };
+  gojs["runtime.clearTimeoutEvent"] = (sp) => {
+    sp >>>= 0;
+    const id = go.mem.getInt32(sp + 8, true);
+    timers.clearTimeout(go._scheduledTimeouts.get(id));
+    go._scheduledTimeouts.delete(id);
+  };
+}
 
 export function loadDingo(source = "./dingo.wasm") {
   if (!loading) {
@@ -31,6 +66,7 @@ async function load(source) {
     }
   }
   const go = new globalThis.Go();
+  useTimers(go, createTimers());
   const { instance } = await instantiate(source, go.importObject);
 
   // go.run resolves only when the Go program exits, which it should never do.

@@ -4,12 +4,15 @@
 // window.api.describe() always works. The logic that needs no DOM lives in
 // ui.js (tested in Node).
 
+import { createLink } from './link.js';
 import { createBridge } from './ble.js';
+import { createFirmware } from './firmware.js';
 import { createApi, createLogger, withUnknownGuard, API_NAME, API_VERSION } from './api.js';
 import {
   esc, fmtBase, parseBaseInput, nodeLabel, boardLabel, configGuard, baseAfterLoad, baseAfterDiscover, loadExample,
   viewFor, fmtClock, fmtDuration, fmtAgo, nodeTitle, nodeRef, nodeAt, opLabel, explainError, icon,
   activityEvent, stoppedEvent, activityHtml, isProblem, bugReport, nodeStatus, applySteps, etaText, guardView,
+  firmwareHtml,
 } from './ui.js';
 import { createFlowController, addOptionsHtml, propsHtml, propValue } from './flow.js';
 
@@ -26,7 +29,16 @@ const logger = createLogger({
 const logLines = []; // { t, line }
 logger.onLine((line) => { logLines.push({ t: Date.now(), line }); if (logLines.length > 1000) logLines.splice(0, logLines.length - 1000); });
 
-const bridge = createBridge({ bluetooth: navigator.bluetooth, log: logger.log });
+// The page's one link to hilux (link.js): the one Connect / Choose device…
+// control and the one status pill are its. The CAN bridge and the firmware
+// client are consumers of it; neither connects by itself.
+const link = createLink({
+  bluetooth: navigator.bluetooth,
+  log: logger.log,
+  // which services this browser's last pick asked for (link.js GRANT_VERSION)
+  grantStore: { get: () => { try { return localStorage.getItem('dingo-web.grant'); } catch { return null; } }, set: (v) => { try { localStorage.setItem('dingo-web.grant', v); } catch { /* blocked */ } } },
+});
+const bridge = createBridge({ link, log: logger.log });
 
 async function loadDingoLazily() {
   // Dynamic import: a missing dingo-loader.js / dingo.wasm must not blank the page.
@@ -40,10 +52,14 @@ async function fetchText(url) {
   return r.text();
 }
 
-const api = createApi({ bridge, dingo: loadDingoLazily, fetchText, log: logger });
+// The firmware service (firmware.js): on the same link as the bridge, one
+// GATT queue; a refusal leaves the link up while the bridge uses it.
+const firmware = createFirmware({ link, log: logger.log });
+
+const api = createApi({ bridge, dingo: loadDingoLazily, fetchText, log: logger, firmware });
 window.api = withUnknownGuard(api);
 
-logger.log('info', `page loaded; Web Bluetooth ${navigator.bluetooth ? 'available' : 'NOT available'}${navigator.bluetooth && typeof navigator.bluetooth.getDevices === 'function' ? ', getDevices() supported' : ''}`);
+logger.log('info', `page loaded; Web Bluetooth ${navigator.bluetooth ? 'available' : 'NOT available'}${navigator.bluetooth && typeof navigator.bluetooth.getDevices === 'function' ? ', remembered devices supported' : ''}`);
 
 // Per-viewer conveniences only: storage may be blocked (private window etc.).
 function stored(key) { try { return localStorage.getItem(key); } catch { return null; } }
@@ -101,7 +117,7 @@ function connectionText() {
 }
 
 function renderTop() {
-  const i = bridge.info();
+  const i = link.info(); // the one connection status: the link's, whichever consumer uses it
   const pill = $('connPill');
   let cls = ''; let html;
   if (!i.bluetoothAvailable) html = `${icon('btOff', 'ico sm')}No Bluetooth in this browser`;
@@ -113,11 +129,29 @@ function renderTop() {
   pill.className = `pill ${cls}`;
   if (pill.innerHTML !== html) pill.innerHTML = html;
   pill.title = connectionText();
-  const live = ['connected', 'connecting', 'reconnecting'].includes(i.state);
-  $('btnConnect').hidden = i.state === 'connected';
-  $('btnConnect').disabled = connecting || live;
-  $('btnDisconnect').hidden = i.state === 'disconnected';
-  $('btnChoose').disabled = connecting || ['connecting', 'reconnecting'].includes(i.state);
+  // The one button: its label is what pressing it does now.
+  const busy = connecting || ['connecting', 'reconnecting'].includes(i.state);
+  const b = $('btnConn');
+  const label = busy ? (i.state === 'reconnecting' ? 'Reconnecting…' : 'Connecting…') : i.state === 'connected' ? 'Disconnect' : 'Connect';
+  if (b.textContent !== label) b.textContent = label;
+  b.disabled = busy || !i.bluetoothAvailable;
+  b.className = i.state === 'connected' && !busy ? 'btn quiet' : 'btn pri';
+  b.title = i.state === 'connected' ? 'disconnect from hilux' : 'connect to hilux (the one Chrome remembers; Chrome asks you to pick it when it has none)';
+  $('btnSwitch').hidden = busy || !i.bluetoothAvailable;
+}
+
+/** The one connection control: what its button does now. Every "Connect" anywhere on the page comes here. */
+function connControl() {
+  const s = link.info().state;
+  if (connecting || s === 'connecting' || s === 'reconnecting') return null;
+  if (s === 'connected') return window.api.disconnect().then(renderTop);
+  return connectClick('click', () => api._connectWithChooser());
+}
+/** Make sure the link is up, from a click anywhere (a panel, a problem card): the one control's Connect. */
+async function ensureLink() {
+  if (link.isConnected()) return true;
+  await connectClick('click', () => api._connectWithChooser());
+  return link.isConnected();
 }
 
 let filterRead = null;
@@ -138,13 +172,20 @@ function refreshDeviceFilter() {
   return run.p;
 }
 
-let prevState = bridge.info().state;
+// The bridge on the link: its filter as the C6 reports it.
 bridge.onState((s) => {
-  const i = bridge.info();
-  if (s === 'connected') { refreshDeviceFilter(); connProblem = null; renderBanner(); } else deviceFilter = null;
+  if (s === 'connected') refreshDeviceFilter(); else deviceFilter = null;
+  renderTop();
+});
+
+// The link (the one connection): its events, the banner, the pill.
+let prevState = link.info().state;
+link.onState((s) => {
+  const i = link.info();
+  if (s === 'connected') { connProblem = null; renderBanner(); }
   // Link events no api call reports: a drop, the reconnect, giving up.
   if (s === 'reconnecting' && prevState === 'connected') addEvent({ at: Date.now(), kind: 'link', tone: 'problem', icon: 'btOff', title: 'Lost the link to hilux; reconnecting', sub: 'The page retries 3 times', durationMs: null, detail: i.lastError || '' });
-  if (s === 'connected' && prevState === 'reconnecting') addEvent({ at: Date.now(), kind: 'link', tone: 'ok', icon: 'bt', title: 'Reconnected to hilux', sub: 'The bridge filter was written again', durationMs: null, detail: '' });
+  if (s === 'connected' && prevState === 'reconnecting') addEvent({ at: Date.now(), kind: 'link', tone: 'ok', icon: 'bt', title: 'Reconnected to hilux', sub: 'The bridge and the firmware panel use it again', durationMs: null, detail: '' });
   if (s === 'failed') {
     const x = explainError({ ok: false, error: i.lastError || 'auto-reconnect gave up' }, { op: 'connect' });
     connProblem = x; renderBanner();
@@ -200,8 +241,8 @@ document.addEventListener('click', (e) => {
   const slot = b.dataset.slot;
   const act = b.dataset.act;
   if (act === 'dismiss') { if (slot === 'banner') { connProblem = null; renderBanner(); } else { problems[slot] = null; renderProblems(); } return; }
-  if (act === 'connect') return $('btnConnect').hidden ? null : $('btnConnect').click();
-  if (act === 'choose') return $('btnChoose').click();
+  // Every connect next-step goes to the one control (its Connect also re-picks in Chrome's chooser when needed).
+  if (act === 'connect') return link.isConnected() ? null : connControl();
   if (act === 'retry') return retries[slot]?.();
   if (act === 'discover') return $('btnDiscover').click();
   if (act === 'check') return $('btnVerify').click();
@@ -210,6 +251,7 @@ document.addEventListener('click', (e) => {
   if (act === 'open-file') return $('file').click();
   if (act === 'select') return setBase(Number(b.dataset.base));
   if (act === 'apply-done') { applyState = null; renderApplyPanel(); renderActions(); return; }
+  if (act.startsWith('fw-')) return firmwareAction(act);
 });
 
 // ----------------------------------------------------------------- calls ----
@@ -240,6 +282,7 @@ api._onCall(({ name, args, result: r }) => {
   const progress = name === 'apply' ? applyState?.progress ?? null : null;
   const ev = activityEvent(name, args, r, { at, nodes: knownNodes, config: Number.isInteger(base) ? loadedFor(base) : null, progress, current: selectedBase, via: name === 'connect' ? 'script' : undefined });
   addEvent(ev);
+  if (name.startsWith('firmware')) { firmwareCalled(name, r); return; }
   if (!r.ok) {
     const x = explainError(r, { op: name, node: Number.isInteger(base) ? nodeRef(knownNodes.get(base), base) : null, progress });
     if (x.where === 'connection') { connProblem = x; renderBanner(); }
@@ -627,12 +670,12 @@ async function connectClick(via, fn) {
     refreshDeviceFilter();
   }
 }
-// A real click: the remembered device first; the chooser only if there is none
-// (or Chrome has not granted it the bridge service).
-$('btnConnect').onclick = () => connectClick('click', () => api._connectWithChooser());
-// Always the chooser (e.g. to pick hilux again).
-$('btnChoose').onclick = () => connectClick('chooser', () => api._chooseDevice());
-$('btnDisconnect').onclick = () => window.api.disconnect().then(renderTop);
+// The one connection control. Connect: the remembered hilux; Chrome's chooser
+// by itself when there is none or its grant lacks a service this page needs.
+// Disconnect when connected.
+$('btnConn').onclick = () => connControl();
+// The small secondary link inside it: a different board, always the chooser.
+$('btnSwitch').onclick = () => connectClick('chooser', () => api._chooseDevice());
 
 $('btnDiscover').onclick = () => run('discover', 'rail', async () => {
   const r = await window.api.discover();
@@ -742,6 +785,115 @@ async function openBurnConfirm() {
 }
 $('btnBurn').onclick = openBurnConfirm;
 
+// -------------------------------------------------------------- firmware ----
+// The hilux C6's own firmware (firmware.js, FIRMWARE.md): Read firmware info,
+// choose or drop a .bin (api.firmwareCheck), confirm, api.firmwareUpdate with
+// its progress, then the reset, the reconnect and the confirmation. Every
+// step is a window.api call, so an agent's calls show here too.
+
+const fw = { info: null, infoAt: null, reading: false, file: null, bytes: null, confirming: false, running: false, progress: null, lastSent: 0, started: null, result: null, problem: null, retry: null };
+
+function renderFirmware() {
+  const html = firmwareHtml(fw);
+  if ($('fwBody').innerHTML !== html) $('fwBody').innerHTML = html;
+  const p = fw.problem;
+  $('fwProblem').innerHTML = p ? problemHtml(p, { eyebrow: `${opLabel(p.op)}${p.code ? ` · ${p.code}` : ''} · ${p.tone === 'warning' ? 'stopped' : 'failed'}`, slot: 'fw', extraActions: [], dismiss: true }) : '';
+  $('btnFwInfo').disabled = fw.running || fw.reading;
+  $('btnFwInfo').textContent = fw.reading ? 'Reading…' : 'Read firmware info';
+}
+
+/** After any firmware* api call (the panel's or an agent's). */
+function firmwareCalled(name, r) {
+  if (r.ok) {
+    if (name === 'firmwareInfo') { fw.info = r; fw.infoAt = Date.now(); }
+    if (name === 'firmwareUpdate') { const i = firmware.lastInfo(); if (i) { fw.info = { ...i, slotName: r.slotName, updatable: i.maxLen > 0 }; fw.infoAt = Date.now(); } }
+    if (fw.problem?.op === name) fw.problem = null;
+  } else {
+    fw.problem = { ...explainError(r, { op: name }), op: name };
+  }
+  renderFirmware();
+}
+
+function firmwareProblem(op, r) {
+  fw.problem = { ...explainError(r, { op }), op };
+  addEvent(activityEvent(op, [], r, { at: Date.now() }));
+  renderFirmware();
+}
+
+/** Read firmware info, from a click: over the page's one link (its Connect first, if it is down). */
+async function firmwareReadInfo() {
+  fw.reading = true; fw.problem = null; fw.retry = () => firmwareReadInfo();
+  renderFirmware();
+  try {
+    if (!(await ensureLink())) return; // the connection control shows why
+    await window.api.firmwareInfo();
+  } finally { fw.reading = false; renderFirmware(); }
+}
+
+async function firmwareLoadFile(file) {
+  if (fw.running) return;
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  fw.file = { name: file.name, size: bytes.length, check: null };
+  fw.bytes = bytes; fw.confirming = false; fw.result = null; fw.problem = null;
+  renderFirmware();
+  const r = await window.api.firmwareCheck(bytes);
+  if (fw.bytes !== bytes) return; // another file meanwhile
+  fw.file.check = r;
+  renderFirmware();
+}
+
+function firmwareUpdate() {
+  if (!fw.bytes || fw.running) return;
+  const bytes = fw.bytes;
+  fw.confirming = false; fw.running = true; fw.result = null; fw.problem = null; fw.progress = null; fw.lastSent = 0; fw.started = Date.now();
+  fw.retry = () => firmwareUpdate();
+  renderFirmware();
+  $('fwPanel').scrollIntoView?.({ block: 'nearest' });
+  return run('firmwareUpdate', null, async () => {
+    const poll = setInterval(() => {
+      const b = api._busy();
+      if (b?.op === 'firmwareUpdate' && b.progress) {
+        fw.progress = b.progress;
+        if (b.progress.phase === 'upload') fw.lastSent = b.progress.sent;
+      }
+      renderFirmware();
+    }, 250);
+    let r;
+    try {
+      // the link may need the chooser: only a click can open it, so before the long call
+      if (!(await ensureLink())) return; // the connection control shows why
+      r = await window.api.firmwareUpdate(bytes);
+    } finally { clearInterval(poll); fw.running = false; }
+    fw.result = r.ok ? r : null;
+    renderFirmware();
+  });
+}
+
+function firmwareAction(act) {
+  if (act === 'fw-info') return firmwareReadInfo();
+  if (act === 'fw-file') return $('fwFile').click();
+  if (act === 'fw-confirm') { if (fw.file?.check?.ok) { fw.confirming = true; renderFirmware(); } return; }
+  if (act === 'fw-cancel') { fw.confirming = false; renderFirmware(); return; }
+  if (act === 'fw-go') return firmwareUpdate();
+  if (act === 'fw-retry') return fw.retry?.();
+  if (act === 'fw-done') { fw.result = null; renderFirmware(); }
+}
+
+$('fwFile').onchange = (e) => { const f = e.target.files[0]; if (f) firmwareLoadFile(f); e.target.value = ''; };
+$('fwPanel').addEventListener('dragover', (e) => { e.preventDefault(); $('fwPanel').classList.add('drag'); });
+$('fwPanel').addEventListener('dragleave', () => $('fwPanel').classList.remove('drag'));
+$('fwPanel').addEventListener('drop', (e) => {
+  e.preventDefault(); $('fwPanel').classList.remove('drag');
+  const f = e.dataTransfer.files[0];
+  if (f) firmwareLoadFile(f);
+});
+// The problem block's ✕ (slot 'fw') goes through the shared handler's 'dismiss'.
+document.addEventListener('click', (e) => {
+  const b = e.target.closest?.('[data-act="dismiss"][data-slot="fw"]');
+  if (b) { fw.problem = null; renderFirmware(); }
+});
+setInterval(() => { if (!fw.running) renderFirmware(); }, 5000); // the "Read … ago" line
+
 // -------------------------------------------------------------- activity ----
 
 function activityShown() { return location.hash === '#activity'; }
@@ -816,6 +968,6 @@ window.addEventListener('hashchange', route);
     cfgSource = (stored('dingo-web.configSource') || 'last session') + ' (restored)';
   }
 }
-renderTop(); renderBanner(); renderRail(); renderNodeCard(); renderCfgSummary(); renderActions(); renderLast(); renderProblems(); route();
+renderTop(); renderBanner(); renderRail(); renderNodeCard(); renderCfgSummary(); renderActions(); renderLast(); renderProblems(); renderFirmware(); route();
 renderView();
 inspect().then(() => setView(viewFor(stored('dingo-web.view'), !!ta.value.trim())));

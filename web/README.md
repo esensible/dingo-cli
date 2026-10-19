@@ -16,6 +16,9 @@ count + CRC verification, burn, read-all, named params — is the same Go code
 | `examples/` | `bench-toggle.json` (a dingoPDM), `c6-empty.json` / `c6-test.json` (the C6 body node, `pdmType` 12) |
 | `vendor/dingoconfig-flow/` | Cory Grant's dingoConfig React Flow editor, vendored **unmodified** (MIT; `VENDORED.md` says which commit) |
 | `flow.js` | the Logic view's adapter: a fake Blazor `dotnet` for that editor, routed to `graphEdit` |
+| `firmware.js` | the hilux C6's own firmware update over its firmware service (FIRMWARE.md): codec, transport for `ota-client.js`, reset/reconnect/confirm; the page's **hilux firmware** panel (API.md "The hilux firmware") |
+| `vendor/c6-ota/` | the esensible monorepo's c6-ota `ota-client.js`, vendored **unmodified**; `SOURCE.json` (its SHA-256, the commit), `vendor.sh` (copy / `--check`) |
+| `test/firmware.test.mjs`, `test/fake-firmware.mjs` | the firmware tests and a fake C6 firmware service |
 | `dingo.wasm`, `wasm_exec.js`, `flow-editor/` | build outputs |
 
 ## Build and test (inside the dev container)

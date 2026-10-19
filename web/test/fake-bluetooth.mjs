@@ -25,12 +25,18 @@
 //    "Connection Error: Connection attempt failed." while the C6 keeps
 //    advertising -- what Chrome on macOS actually reported (2026-10-03).
 
-import { BRIDGE_SERVICE, BRIDGE_TX, BRIDGE_RX, BRIDGE_FILTER, BRIDGE_STATS, decodeFrames, encodeFrames, decodeFilter, filterMatches } from '../ble.js';
+//  - GATT Service Changed: device.serviceChanged() makes every characteristic
+//    handed out before throw InvalidStateError "GATT Service no longer exists."
+//  - the firmware service (FIRMWARE.md) when a fake-firmware.mjs FakeFirmwareBox
+//    is attached as c6.firmware; device.firmwareNotGranted: picked before the
+//    page asked for it (SecurityError until a pick that lists it).
+
+import { BRIDGE_SERVICE, BRIDGE_TX, BRIDGE_RX, BRIDGE_FILTER, BRIDGE_STATS, FIRMWARE_SERVICE, decodeFrames, encodeFrames, decodeFilter, filterMatches } from '../ble.js';
 
 const tick = (ms = 0) => new Promise((r) => setTimeout(r, ms));
 
-function domErr(name, message) { const e = new Error(message); e.name = name; return e; }
-function refusal(c6) {
+export function domErr(name, message) { const e = new Error(message); e.name = name; return e; }
+export function refusal(c6) {
   return c6.refuse === 'other' ? domErr('SecurityError', 'GATT operation not authorized.') : domErr('NotSupportedError', 'GATT operation failed for unknown reason.');
 }
 
@@ -156,10 +162,13 @@ export class FakeNode { receive() {} send(id, data) { this.bus.transmit(this, id
 
 // ------------------------------------------------------------ fake C6 bridge ----
 
-class FakeCharacteristic extends EventTarget {
-  constructor(server, uuid, impl) { super(); this.server = server; this.uuid = uuid; this.impl = impl; this.value = null; }
+export class FakeCharacteristic extends EventTarget {
+  constructor(server, uuid, impl) { super(); this.server = server; this.uuid = uuid; this.impl = impl; this.value = null; this.generation = server.device?.gattGeneration ?? 0; }
   async _op(name, fn) {
     const s = this.server;
+    // GATT Service Changed (device.serviceChanged()): Chrome invalidates every
+    // service and characteristic object it handed out before; they must be fetched again.
+    if (this.generation !== (s.device?.gattGeneration ?? 0)) throw domErr('InvalidStateError', 'GATT Service no longer exists.');
     if (!s.connected) throw domErr('NetworkError', 'GATT Server is disconnected. Cannot perform GATT operations.');
     if (s.inFlight) throw domErr('NetworkError', 'GATT operation already in progress.');
     s.inFlight = name;
@@ -256,7 +265,8 @@ class FakeGattServer {
   async connect() {
     const d = this.device;
     d.connectCalls++;
-    await tick(d.connectDelayMs);
+    d.beginLinkOp('gatt.connect()');
+    try { await tick(d.connectDelayMs); } finally { d.endLinkOp(); }
     if (d.failConnects > 0) { d.failConnects--; throw domErr('NetworkError', 'Connection attempt failed.'); }
     if (!d.inRangeKnown) throw domErr('NetworkError', 'Bluetooth Device is no longer in range.');
     if (!d.powered) throw domErr('NetworkError', 'Connection attempt failed.');
@@ -278,6 +288,10 @@ class FakeGattServer {
   async getPrimaryService(uuid) {
     await tick(0);
     if (!this.connected) throw domErr('NetworkError', 'GATT Server is disconnected.');
+    if (uuid === FIRMWARE_SERVICE && this.c6.firmware) {
+      if (this.device.firmwareNotGranted) throw domErr('SecurityError', "Origin is not allowed to access the service. Tip: Add the service UUID to 'optionalServices' in requestDevice() options. https://goo.gl/HxfxSQ");
+      return this.c6.firmware.makeService(this);
+    }
     if (uuid !== BRIDGE_SERVICE || this.device.noBridgeService) throw domErr('NotFoundError', 'No Services matching UUID ' + uuid + ' found in Device.');
     // Picked before the bridge service existed: Chrome never granted it to this origin.
     if (this.device.serviceNotGranted) throw domErr('SecurityError', "Origin is not allowed to access the service. Tip: Add the service UUID to 'optionalServices' in requestDevice() options. https://goo.gl/HxfxSQ");
@@ -299,17 +313,51 @@ export class FakeDevice extends EventTarget {
     this.watchCalls = 0;
     this.noBridgeService = false;
     this.stalePairing = false;
+    this.gattGeneration = 0; // bumped by serviceChanged()
     this.gatt = new FakeGattServer(this);
   }
+  /**
+   * One connection owner (web/link.js): a gatt.connect() or a watch for
+   * advertisements while another is in flight on this device fails, and is
+   * counted (`overlaps`; `maxLinkOps` the most at once) so a test can assert
+   * there was never more than one.
+   */
+  beginLinkOp(what) {
+    this.linkOps = (this.linkOps ?? 0) + 1;
+    this.maxLinkOps = Math.max(this.maxLinkOps ?? 0, this.linkOps);
+    if (this.linkOps > 1) {
+      this.overlaps = (this.overlaps ?? 0) + 1;
+      this.linkOps--;
+      throw domErr('InvalidStateError', `fake: ${what} while another connect/watch is in flight on this device (the page must have one connection owner)`);
+    }
+  }
+  endLinkOp() { this.linkOps--; }
+  /** The C6 indicated GATT Service Changed (hilux b3de8e3, after an update that changes the table): every old service/characteristic object is invalid. */
+  serviceChanged() { this.gattGeneration++; }
   async watchAdvertisements(opts = {}) {
     this.watchCalls++;
+    // As Chrome: one watch at a time per device. A call while another is
+    // still being set up is refused; an abort ends the device's watch,
+    // whoever started it (seen on the hardware 2026-10-19 with the bridge
+    // and the firmware client both reconnecting after the C6's reset).
+    if (this.watchPending) throw domErr('InvalidStateError', "Failed to execute 'watchAdvertisements' on 'BluetoothDevice': Pending watch advertisements operation.");
+    this.beginLinkOp('watchAdvertisements()');
+    let ended = false;
+    const end = () => { if (!ended) { ended = true; this.endLinkOp(); } };
+    opts.signal?.addEventListener('abort', end);
+    this.watchPending = true;
+    await tick(this.watchSetupMs ?? 3);
+    this.watchPending = false;
+    if (opts.signal?.aborted) { end(); throw domErr('AbortError', 'The Bluetooth operation was cancelled.'); }
     this.watchingAdvertisements = true;
-    const t = setTimeout(() => {
+    // A C6 advertises every advertDelayMs while it is powered and advertising
+    // (one that comes back from a reset is seen within one period).
+    const t = setInterval(() => {
       if (!this.watchingAdvertisements || !this.advertising || !this.powered) return;
       this.inRangeKnown = true;
       this.dispatchEvent(new Event('advertisementreceived'));
     }, this.advertDelayMs);
-    opts.signal?.addEventListener('abort', () => { this.watchingAdvertisements = false; clearTimeout(t); });
+    opts.signal?.addEventListener('abort', () => { this.watchingAdvertisements = false; clearInterval(t); });
   }
   /** Simulate the link dropping (C6 reset, out of range...). */
   dropLink() {
@@ -334,6 +382,7 @@ export function makeFakeBluetooth({ remembered = true, inRangeKnown = true, late
       if (this.noUserActivation) throw domErr('SecurityError', 'Must be handling a user gesture to show a permission request.');
       if (!this.chooserResult) throw domErr('NotFoundError', 'User cancelled the requestDevice() chooser.');
       this.chooserResult.serviceNotGranted = false; // a pick grants the optionalServices asked for
+      if (opts?.optionalServices?.includes(FIRMWARE_SERVICE)) this.chooserResult.firmwareNotGranted = false;
       this.remembered = [this.chooserResult];
       return this.chooserResult;
     },

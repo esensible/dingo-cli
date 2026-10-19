@@ -183,6 +183,22 @@ result's `typeCheck` says what it saw.
 - `sendFrame` puts raw frames on a live vehicle bus — only with a clear reason
   (e.g. the CANBoard command id 0x643 test from `dingopdm-hardware`).
 
+## The hilux C6's own firmware
+
+Not a PDM operation: the C6 that bridges CAN can update itself over its
+firmware service. `api.firmwareInfo()` (running digest, slot, `pending` =
+on trial, `maxLen`) → `api.firmwareCheck(image)` (dry run, sends nothing) →
+`api.firmwareUpdate(image)` **only when the user asks**. `image` is a URL
+the page can fetch or a byte array (a person usually chooses the file in the
+page's hilux firmware panel instead). The update takes 1–2 minutes plus
+~30 s for the reset and the self-confirmation (20 s after boot); CAN frames
+are dropped meanwhile, so the vehicle should be parked. It needs the
+**Firmware role** (granted on the Kindle; `code: 'NOT_AUTHORISED'` means a
+person must grant it: do not retry). Errors carry `code`: `ON_TRIAL` means
+wait ~20 s; `BUSY` another upload; `DROPPED`/`STALLED` call `firmwareUpdate`
+again with the same image within 60 s (it resumes); `ROLLED_BACK` the update
+failed its trial and the old firmware runs again.
+
 ## How it works (for diagnosing)
 
 - The C6 exposes a GATT "CAN bridge": frames written to `tx` go on the bus;

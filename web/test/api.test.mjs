@@ -13,7 +13,7 @@ import { fileURLToPath } from 'node:url';
 
 import {
   createBridge, encodeFrames, decodeFrames, checkFrame, encodeFilter, decodeFilter, normaliseFilter,
-  filterMatches, parseStats, BRIDGE_SERVICE, KEYLESS_SERVICE, ROLE_REFUSED,
+  filterMatches, parseStats, BRIDGE_SERVICE, KEYLESS_SERVICE, FIRMWARE_SERVICE, ROLE_REFUSED,
 } from '../ble.js';
 import { createApi, createLogger, withUnknownGuard, toPlain } from '../api.js';
 import { makeFakeBluetooth, FakePdm, FakeNode, crcOfParams } from './fake-bluetooth.mjs';
@@ -118,10 +118,10 @@ test('bridge: connects to the remembered device, never opens the chooser from sc
   assert.equal(w2.bridge.info().state, 'disconnected');
   assert.match(w2.bridge.info().lastError, /Connect button/);
 
-  // with a gesture: requestDevice with the name filter + both services
+  // with a gesture: requestDevice with the name filter + every service the page uses
   w2.bluetooth.chooserResult = w2.device;
   await w2.bridge.connect({ allowChooser: true });
-  assert.deepEqual(w2.bluetooth.requestDeviceCalls[0], { filters: [{ name: 'hilux' }], optionalServices: [BRIDGE_SERVICE, KEYLESS_SERVICE] });
+  assert.deepEqual(w2.bluetooth.requestDeviceCalls[0], { filters: [{ name: 'hilux' }], optionalServices: [BRIDGE_SERVICE, KEYLESS_SERVICE, FIRMWARE_SERVICE] });
   assert.equal(w2.bridge.isConnected(), true);
 });
 
@@ -648,14 +648,14 @@ test('bridge: Connect click uses the remembered device without the chooser; choo
   w3.device.serviceNotGranted = true;
   const r3 = await w3.api.connect();
   fail(r3, /not granted this page the CAN bridge service/);
-  assert.match(r3.error, /Choose device/);
-  assert.match(r3.hint, /Choose device/);
+  assert.match(r3.error, /click Connect/);
+  assert.match(r3.hint, /Connect button/);
   assert.equal(w3.bluetooth.requestDeviceCalls.length, 0);
   assert.doesNotMatch(r3.error, /old pairing/, 'our own disconnect is not a dropped link');
-  // a click whose activation expired: the error still says to click "Choose device…"
+  // a click whose activation expired: the error still says to click Connect (which then opens the chooser at once)
   w3.bluetooth.noUserActivation = true;
   const r4 = await w3.api._connectWithChooser();
-  fail(r4, /Choose device.*the chooser did not open: SecurityError: Must be handling a user gesture/);
+  fail(r4, /click Connect.*the chooser did not open: SecurityError: Must be handling a user gesture/);
 
   // nothing remembered → the chooser (as before)
   const w5 = world({ pdm: null, fake: { remembered: false } });

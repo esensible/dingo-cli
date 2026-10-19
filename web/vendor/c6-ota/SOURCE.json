@@ -1,0 +1,7 @@
+{
+  "file": "ota-client.js",
+  "source": "github.com/esensible/esensible projects/c6-ota/js/ota-client.js",
+  "commit": "a69cb24df984c2eac538a66319ab475ea2477d09",
+  "sha256": "5570f7a533c8fc8a6b20e1a70a53c3c16d7f2503bfb9e6f72a0027453d3edd63",
+  "changes": "none: byte for byte the monorepo file"
+}

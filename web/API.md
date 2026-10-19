@@ -8,6 +8,8 @@ what an agent gets.
 ```
 Chrome ──Web Bluetooth──▶ hilux ESP32-C6 (CAN bridge, hilux/wireless-can/BRIDGE.md) ──CAN 500k──▶ dingoPDM(s)
           web/ble.js                                     web/dingo.wasm (dingo-cli protocol + encoder)
+       └─Web Bluetooth──▶ the same C6's firmware service (hilux/wireless-can/FIRMWARE.md): its own firmware update
+          web/firmware.js + web/vendor/c6-ota/ota-client.js
 ```
 
 ## Conventions
@@ -53,6 +55,9 @@ Chrome ──Web Bluetooth──▶ hilux ESP32-C6 (CAN bridge, hilux/wireless-c
 | `paramNames({filter, pdmType, offset, limit})` | names accepted by set/getParam | `total, names[], nextOffset` |
 | `sendFrame(id, hex)` | one raw frame, like `dingo tx` | `idHex, dlc, dataHex` |
 | `filter(entries?)` | get or set the bridge rx filter | `filter[], device[], text` |
+| `firmwareInfo()` | the hilux C6's own firmware (its firmware service): running digest, slot, on trial or not, room for an update | `sha256, slot, slotName, pending, maxLen, updatable` |
+| `firmwareCheck(image)` | **dry run** of an update: the image check (c6-ota's `checkImage`), and after `firmwareInfo` whether it fits and is already running; sends nothing | `len, sha256, maxLen, fits, running, sameAsRunning` |
+| `firmwareUpdate(image, {allowSame})` | the whole C6 firmware update (see "The hilux firmware" below) | `len, sha256, previous{sha256,slot}, slot, slotName, chunk, window, resumedFrom, resumes, rewinds, resends, written, uploadMs, kbps, committed, confirmMs, ms` |
 | `skills()` / `skill(name, {offset, maxChars})` | skills served from `web/skills/` | `skills[]` / `markdown, totalChars, nextOffset` |
 | `log({last})` | app log ring buffer (500 lines) | `lines[]` |
 
@@ -75,6 +80,17 @@ These guards are enforced in code:
   config whose `pdmType` differs, unless `allowTypeMismatch` is set. A node
   that sends nothing in that window is applied unchecked (logged as a warning);
   `typeCheck` in the result says which happened.
+
+- **Write mismatch:** when the PDM acknowledges a WriteAll with another count
+  or CRC, `apply` reads the live CRC at once and the error says whether the
+  PDM now holds the config. dingoFW up to 0.5.11 applies a WriteAll live
+  whenever the count matches, and its CAN receive mailbox could hand one
+  frame over twice and lose another (fixed in dingoFW `436e683`): on the
+  bench PDM (0.5.3) 3 of 14 applies over the bridge came back `write CRC
+  mismatch` with the right count, consistent with that race; each time the
+  live CRC still matched, as it does when the lost parameter's value is its
+  default. Apply again until the acknowledgement is clean
+  before burning.
 
 `verify(base, cfg)` with a config whose `baseId` is not `base` still answers,
 with a `warning`. The page's buttons go further: while a config is in the
@@ -143,6 +159,105 @@ Two errors are not fixed by retrying, and `api.*` says so in `hint`:
   Bluetooth, PAIR on the Kindle with the CAN bridge role, connect again. Chrome
   passes on no reason for the drop, so this too is inferred from the symptom.
 
+## The hilux firmware (`web/firmware.js`, the Firmware panel)
+
+The **hilux firmware** panel updates the C6 itself (not a PDM) over its
+firmware service, `d9e5a0d0-…` (hilux `wireless-can/FIRMWARE.md` in the
+esensible monorepo). The update logic — window, Acks, a gap's rewind, a
+stall's resend, resume after a dropped link — is the monorepo's shared
+c6-ota `ota-client.js`, vendored unmodified in `web/vendor/c6-ota/` (see
+"Vendored c6-ota" below). `firmware.js` is its hilux transport: the fixed
+byte layouts of the three characteristics, the access errors, and what comes
+after the commit.
+
+Steps on the page, each a `window.api` call:
+
+1. **Read firmware info** (`firmwareInfo`): the running image's digest (its
+   last 32 bytes, which the C6 logs at boot), slot (`ota_0`/`ota_1`),
+   *Confirmed* or *On trial*, and the room in the other slot.
+2. **Choose image…** or drop the `.bin` on the panel (`firmwareCheck`): the
+   ESP32-C6 app image c6-image makes (`wireless-can.bin`), checked before
+   anything is sent. An ELF, a cut-short file or one too big is refused here.
+3. **Update firmware…** asks first (no native dialog), then `firmwareUpdate`:
+   Info → Begin → the upload (progress, kB/s, time left) → Commit → hilux
+   answers *Rebooting* and resets → the page reconnects and asks Info every
+   2 s until the new digest runs and is no longer on trial (it confirms
+   itself 20 s after its boot). A rollback (three boots without confirming)
+   is reported as such, `ROLLED_BACK`.
+
+**Update when parked**: each 4 KiB sector erase on the C6 masks interrupts,
+so CAN frames are dropped during the 1–2 minute transfer (the PDMs keep
+running on their own); then WiFi, Bluetooth and CAN go for a few seconds.
+
+Access: the **Firmware role** (Kindle → Settings → Bluetooth → this computer
+→ Firmware, then a second tap; or Pair new device with Firmware). It is a
+separate role from CAN bridge: the panel works with either or both. The
+refusal arrives as the bridge's does (on macOS `NotSupportedError: GATT
+operation failed for unknown reason.`), inferred on the `status` subscribe
+or a `control` write, and shown as *This computer isn't allowed to update
+hilux's firmware*, with the Kindle steps. A device picked before this page
+asked for the firmware service needs **Choose device…** (the top bar's) once
+(Chrome grants services only on a pick; every pick now asks for the bridge,
+keyless and firmware services).
+
+Errors come back with `code`: the C6's own names (`BUSY`, `NO_UPLOAD`,
+`TIMEOUT`, `LENGTH`, `NO_SPACE`, `HASH`, `FLASH`, `IMAGE` with c6-ota's
+reason in words, `ON_TRIAL`, `UNAVAILABLE`, `MALFORMED`, `SWITCH`), the
+link's (`NOT_AUTHORISED`, `SERVICE_NOT_GRANTED`, `NO_FIRMWARE_SERVICE`,
+`STALE_PAIRING_SUSPECTED`, `NEEDS_USER_GESTURE`, `DROPPED`, `STALLED`), and
+the page's (`SAME`: the image already runs; `NO_RESET`, `NOT_BACK`,
+`NOT_CONFIRMED`, `ROLLED_BACK`). The panel names the code in each problem.
+
+**Resume:** a dropped link mid-upload reconnects and resumes on its own (up
+to 3 times per update; the C6 keeps an upload for 60 s after its last
+bytes). If that gives up, **Resume the update** (or `firmwareUpdate` with the
+same image within 60 s) carries on from what the C6 has.
+
+**Service Changed:** a hilux firmware whose GATT table differs from the last
+one indicates GATT Service Changed to bonded clients (hilux `b3de8e3`), and
+Chrome then invalidates every service and characteristic object it handed
+out. Both `firmware.js` and `ble.js` fetch their characteristics again on
+every link (`link.service()` belongs to the current link; after Rebooting
+included) and never keep them across links; the fake models the
+invalidation (`device.serviceChanged()`) and the tests run updates and
+reconnects through it.
+
+**One link.** `web/link.js` is the page's only connection to hilux: picking
+it (getDevices / the chooser), connecting (and with that macOS's pairing),
+watching for its advertisements (bounded), reconnecting after a drop or the
+C6's reset, and the one GATT queue. The CAN bridge (`ble.js`) and the
+firmware client (`firmware.js`) are its consumers: neither calls
+`gatt.connect()`, `watchAdvertisements()`, `requestDevice()` or
+`getDevices()` (a test checks the source), and the page has one Connect /
+Choose device… control and one status pill, the link's. After Rebooting the
+update waits for the shared link to come back. (Before, each connected and
+reconnected by itself; after the C6's reset on 2026-10-19 their
+advertisement watches collided — "Pending watch advertisements operation",
+then "AbortError: The Bluetooth operation was cancelled" — and Chrome's Web
+Bluetooth for the page stopped answering until a reload.) A refused consumer
+lets go of the link, which stays up while the other uses it.
+`firmwareInfo`/`firmwareUpdate` are device ops (one at a time with the
+others). From script, `image` is a URL the page can fetch (a file served
+next to it, or a `data:application/octet-stream;base64,…` URL) or a byte
+array; the page passes the chosen file's bytes.
+
+### Vendored c6-ota
+
+`web/vendor/c6-ota/ota-client.js` is the monorepo's
+`projects/c6-ota/js/ota-client.js` byte for byte; `SOURCE.json` records its
+SHA-256 and the monorepo commit. `web/test/firmware.test.mjs` fails if the
+copy differs from `SOURCE.json` (an edit here), and from the monorepo's file
+when that is visible. `web/vendor/c6-ota/vendor.sh` copies it again
+(`--check` compares all three); it needs both repos, so run it from `~/src`:
+
+```
+podman run --rm -v "$HOME/src:/src" -w /src/dingo-cli localhost/dingo-dev:latest \
+    -lc 'sh web/vendor/c6-ota/vendor.sh --check'
+```
+
+(when vendoring, pass `-e C6_OTA_COMMIT=<commit>`: the image's git cannot
+read the monorepo).
+
 ## Skills
 
 `web/sync-skills.sh` (run it in the container) does the following:
@@ -180,11 +295,39 @@ It covers the CLI → api mapping, the workflow and the safety rules.
 - **Reconnect:** after an unexpected disconnect it retries 3 times with backoff
   and writes the filter again. The state then becomes `connected` or `failed`.
 
+## Background tabs (web/timers.js)
+
+A hidden tab's timers are late by up to ~1 s (measured on Chrome/macOS:
+`setTimeout(5)` → 337 ms, `setTimeout(2)` → up to 1036 ms; a Worker's
+→ ~64 ms). The WASM keeps protocol time with Go timers, so WriteAll's 8 ms
+pause after every 8 params stretched an apply to 135 s, which then failed.
+`dingo-loader.js` therefore gives the Go runtime `timers.js`: native timers
+while the tab is visible; while it is hidden, a MessageChannel loop for any
+timer due within 1.1 s (message events are not coarsened: 0.1 ms). After it,
+a hidden-tab apply took 3.4 s, as a visible one does. The pause is a timing
+requirement of the PDM's receive path, and the dingo protocol acknowledges
+no WriteAll value (a value is answered only when rejected), so nothing the
+device sends could pace it instead.
+
 ## Tests
 
 ```
 podman exec dingo-web bash -lc 'cd /workspace && node web/test/api.test.mjs'
+podman exec dingo-web bash -lc 'cd /workspace && node --test web/test/firmware.test.mjs'
+podman exec dingo-web bash -lc 'cd /workspace && node --test web/test/timers.test.mjs'
 ```
+
+- **Firmware:** `test/firmware.test.mjs` tests `firmware.js`'s codec against
+  FIRMWARE.md's test vectors, the error names, the vendored ota-client.js
+  against `SOURCE.json`, and whole updates against `test/fake-firmware.mjs`
+  (a fake C6 firmware service on the fake Bluetooth): upload, commit, reset,
+  reconnect, trial, confirmed; a dropped link that resumes; a gap; BUSY,
+  ON_TRIAL, UNAVAILABLE, a too-big image, the same image, an ELF; IMAGE at
+  the commit; a rollback; no Firmware role (both of Chrome's forms); a
+  device picked before the service existed; next to a connected bridge on
+  one GATT queue; GATT Service Changed at the update's boot and at plain
+  reconnects (the old objects throw `InvalidStateError`; both clients must
+  fetch anew); the api calls and the panel's HTML and error headlines.
 
 - **Page logic:** `test/ui.test.mjs` tests `ui.js` (Base id parsing, the
   config/Base id guard, node labels, examples, listen/discover HTML) without a DOM.

@@ -29,7 +29,7 @@
     "dir": "web-api",
     "description": "How to do with window.api in the dingo-web page (Chrome, Web Bluetooth to the hilux C6 CAN bridge) everything the other skills do with the `dingo` CLI: discover PDMs, dry-run encode a dingoConfig, apply, verify, burn, read and set parameters, listen to the bus. Includes the CLI → api mapping, the connect/encode/apply/verify/burn workflow, and the safety rules. Read this first, then dingopdm-config before building a config.",
     "path": "skills/web-api/SKILL.md",
-    "chars": 12750,
+    "chars": 13727,
     "assets": []
   }
 ]

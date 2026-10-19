@@ -13,7 +13,7 @@ import {
   EXAMPLES, fmtBase, parseBaseInput, boardLabel, nodeLabel, configLabel, configGuard, baseAfterLoad, baseAfterDiscover,
   loadExample, listenHtml, discoverHtml, nodesHtml, esc,
   viewFor, fmtClock, fmtDuration, fmtAgo, nodeTitle, nodeRef, nodeAt, explainError, activityEvent, stoppedEvent, activityHtml,
-  bugReport, scrubText, nodeStatus, applySteps, etaText, guardView,
+  bugReport, scrubText, nodeStatus, applySteps, etaText, guardView, firmwareHtml,
 } from '../ui.js';
 import { ROLE_REFUSED, STALE_PAIRING } from '../ble.js';
 
@@ -169,8 +169,8 @@ test('ui: errors → headline, meaning, next step, technical detail; where they 
   assert.match(stale.meaning, /Chrome doesn't say why/, 'inferred, and says so');
   assert.match(stale.steps[0], /Forget This Device/);
 
-  const grant = explainError({ ok: false, error: `not connected: Chrome has not granted this page the CAN bridge service on hilux (it was picked before the service existed): a person must click the page's "Choose device…" button and pick it again` }, { op: 'apply' });
-  assert.equal(grant.where, 'connection'); assert.deepEqual(grant.actions, [{ action: 'choose', label: 'Choose device…', primary: true }]);
+  const grant = explainError({ ok: false, error: "not connected: Chrome has not granted this page the CAN bridge service on hilux (it was picked before this page asked for it): a person must click Connect and pick hilux in Chrome's chooser" }, { op: 'apply' });
+  assert.equal(grant.where, 'connection'); assert.deepEqual(grant.actions, [{ action: 'connect', label: 'Connect', primary: true }], 'the one control: its Connect re-picks by itself');
 
   const none = explainError({ ok: false, error: "no remembered 'hilux' device: a person must click the page's Connect button once (Chrome only opens the Bluetooth chooser from a real click)" });
   assert.equal(none.where, 'connection'); assert.equal(none.tone, 'warning'); assert.equal(none.headline, 'Connect once to pick hilux');
@@ -330,4 +330,51 @@ test('ui: the config/node guard as a person reads it', () => {
   assert.equal(empty.headline, 'No node selected');
   assert.equal(empty.fixes[0].label, 'Select C6 body node', 'named from the config when the node has not been found');
   assert.equal(guardView(configGuard({ value: 0x500 }, c6Info, nodes), c6Info, nodes, 0x500), null);
+});
+
+test('ui: one connection control on the whole page — one button, one status; everything else points at it', async () => {
+  const html = readFileSync(join(webDir, 'index.html'), 'utf8');
+  // The control: one status, one button, one secondary "another hilux" link, all inside #connCtl.
+  const ctl = html.match(/<div id="connCtl"[\s\S]*?<\/div>/)?.[0];
+  assert.ok(ctl, 'index.html has #connCtl');
+  assert.equal((html.match(/id="connPill"/g) || []).length, 1);
+  assert.equal((html.match(/role="status"/g) || []).length, 1, 'one connection status');
+  assert.ok(ctl.includes('id="btnConn"') && ctl.includes('id="btnSwitch"') && ctl.includes('id="connPill"'));
+  // No other connect / disconnect / reconnect / choose control anywhere in the markup.
+  const outside = html.replace(ctl, '');
+  for (const re of [/<button[^>]*>\s*(Connect|Disconnect|Reconnect|Choose device)/i, /data-act="(fw-)?(connect|choose|disconnect)"/, /id="btn(Connect|Disconnect|Choose)"/]) {
+    assert.doesNotMatch(outside, re, `a second connection control outside #connCtl (${re})`);
+  }
+  // Panels rendered from ui.js (the firmware panel through its states) carry none either.
+  const info = { sha256: 'a1'.repeat(32), slot: 0, slotName: 'ota_0', pending: false, maxLen: 0x1e0000, updatable: true };
+  for (const fw of [{ info: null, file: null }, { info, file: null }, { info, running: true, started: 0, progress: { phase: 'booting', sent: 1, total: 1, kbps: 1 } }]) {
+    assert.doesNotMatch(firmwareHtml(fw, 1000), /Choose device|data-act="(fw-)?(connect|choose)"|>\s*(Connect|Reconnect)\s*</, 'firmware panel');
+  }
+  // Problem cards: a connection next step is only ever the one control's action, called Connect.
+  const errors = [
+    ["This computer isn't allowed to use the CAN bridge", 'connect'], ['x (the link dropped while connecting; old pairing)', 'connect'],
+    ['Chrome has not granted this page the CAN bridge service', 'connect'], ['User cancelled the requestDevice() chooser.', 'connect'],
+    ["no remembered 'hilux' device", 'connect'], ['waiting for an advertisement from hilux timed out', 'connect'],
+    ['reconnect gave up after 3 attempts', 'connect'], ['gatt.connect() timed out', 'connect'],
+  ];
+  for (const [error, op] of errors) {
+    const x = explainError({ ok: false, error }, { op });
+    for (const a of x.actions) {
+      assert.ok(!['choose', 'fw-choose', 'fw-connect'].includes(a.action), `${error}: ${a.action}`);
+      if (a.action === 'connect') assert.equal(a.label, 'Connect', error);
+    }
+  }
+  for (const code of ['NOT_AUTHORISED', 'STALE_PAIRING_SUSPECTED', 'SERVICE_NOT_GRANTED', 'NO_FIRMWARE_SERVICE', 'NEEDS_USER_GESTURE', 'DROPPED', 'NOT_BACK']) {
+    const x = explainError({ ok: false, error: 'x', code }, { op: 'firmwareUpdate' });
+    for (const a of x.actions) {
+      assert.ok(!['choose', 'fw-choose', 'fw-connect'].includes(a.action), `${code}: ${a.action}`);
+      if (a.action === 'connect') assert.equal(a.label, 'Connect', code);
+    }
+    assert.doesNotMatch(JSON.stringify(x), /Choose device|turn Bluetooth off|toggle Bluetooth/i, code);
+  }
+  // app.js: the only handlers that connect are the one control's (its button, its "another hilux" link, and connControl/ensureLink).
+  const app = readFileSync(join(webDir, 'app.js'), 'utf8');
+  assert.equal((app.match(/_connectWithChooser\(\)/g) || []).length, 2, 'Connect: connControl and ensureLink only');
+  assert.equal((app.match(/_chooseDevice\(\)/g) || []).length, 1, 'the chooser: the "another hilux" link only');
+  assert.doesNotMatch(app, /_firmwareConnect|btnConnect|btnDisconnect|btnChoose/);
 });

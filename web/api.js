@@ -8,9 +8,10 @@
 //   { ok: true, ... }  or  { ok: false, error: "...", hint?: "what to do next" }
 
 import { MAX_ID, hex3, toHex, fmtFilter, ROLE_REFUSED } from './ble.js';
+import { checkImage, slotName, FIRMWARE_ROLE_REFUSED, SLOT_UNKNOWN } from './firmware.js';
 
 export const API_NAME = 'dingo-web';
-export const API_VERSION = '1.1.0';
+export const API_VERSION = '1.2.0';
 
 // ------------------------------------------------------------------ log ----
 
@@ -33,7 +34,8 @@ export function createLogger({ max = 500, sink, now = () => new Date() } = {}) {
 // -------------------------------------------------------------- helpers ----
 
 class ApiError extends Error {
-  constructor(message, hint) { super(message); this.hint = hint; }
+  /** code: a machine-readable reason, passed on as the result's `code` (the firmware calls: BUSY, ON_TRIAL, IMAGE, NOT_AUTHORISED, …). */
+  constructor(message, hint, code) { super(message); this.hint = hint; if (code) this.code = code; }
 }
 
 const errText = (e) => (e?.message ? e.message : String(e));
@@ -111,8 +113,9 @@ const isPlainObject = (o) => o !== null && typeof o === 'object' && !Array.isArr
 function hintFor(msg, base) {
   const m = msg.toLowerCase();
   // Before the generic connection hints: these are not fixed by retrying.
+  if (m.includes(FIRMWARE_ROLE_REFUSED.toLowerCase())) return 'a person must grant this computer the Firmware role on the Kindle page (Settings → Bluetooth); retrying from here will not help';
   if (m.includes(ROLE_REFUSED.toLowerCase())) return "a person must grant this computer the CAN bridge role on the Kindle page (Settings → Bluetooth); retrying from here will not help. Then api.connect()";
-  if (m.includes('not granted this page')) return "a person must click the page's \"Choose device…\" button and pick 'hilux' again (Chrome grants the CAN bridge service only on a pick); after that api.connect() works from script";
+  if (m.includes('not granted this page')) return "a person must click the page's Connect button: it opens Chrome's chooser to pick 'hilux' again (Chrome grants a service only on a pick); after that api.connect() works from script";
   if (m.includes('old pairing')) return "ask the person to forget 'hilux' in macOS System Settings → Bluetooth and PAIR again on the Kindle with the CAN bridge role, then click Connect";
   if (m.includes('no remembered') || m.includes('user gesture') || m.includes('chooser')) return "a person must click the page's Connect button once; after that api.connect() works from script";
   if (m.includes('web bluetooth is not available')) return 'open http://localhost:5173 in desktop Chrome; Web Bluetooth needs a secure origin';
@@ -125,6 +128,18 @@ function hintFor(msg, base) {
   return undefined;
 }
 
+async function defaultFetchBytes(url) {
+  const r = await fetch(url, { cache: 'no-store' });
+  if (!r.ok) throw new Error(`HTTP ${r.status} for ${url}`);
+  return new Uint8Array(await r.arrayBuffer());
+}
+
+/** A firmware.js / ota-client.js error as an ApiError: its message, hint and code. */
+function fwError(e) {
+  if (e instanceof ApiError) return e;
+  return new ApiError(errText(e), e?.hint ?? hintFor(errText(e)), typeof e?.code === 'string' ? e.code : undefined);
+}
+
 // -------------------------------------------------------------- the api ----
 
 /**
@@ -133,8 +148,10 @@ function hintFor(msg, base) {
  *   dingo      the dingo WASM object, or an async loader () => dingo (lazy; may fail)
  *   fetchText  async (url) => string (for skills)
  *   log        a createLogger() object, or a function (level, msg)
+ *   firmware   from firmware.js createFirmware() (the firmware* calls; optional)
+ *   fetchBytes async (url) => Uint8Array (a firmware image named by URL; default fetch())
  */
-export function createApi({ bridge, dingo, fetchText, log, opTimeouts = {}, now = () => Date.now() } = {}) {
+export function createApi({ bridge, dingo, fetchText, log, firmware = null, fetchBytes = defaultFetchBytes, opTimeouts = {}, now = () => Date.now() } = {}) {
   const logger = log && typeof log.lines === 'function' ? log : createLogger({ sink: typeof log === 'function' ? log : undefined });
   const L = (level, msg) => logger.log(level, msg);
 
@@ -217,6 +234,30 @@ export function createApi({ bridge, dingo, fetchText, log, opTimeouts = {}, now 
     await bridge.setFilter([[base, 0x7ff]]);
   }
 
+  // ---- firmware (firmware.js: hilux's firmware service, its own connection to the same device)
+  async function ensureFirmware(opts = {}) {
+    if (!firmware) throw new ApiError('no firmware client in this page');
+    if (firmware.isConnected() && !opts.forceChooser) return;
+    try { await firmware.connect(opts); } catch (e) { throw fwError(e); }
+  }
+
+  /** A firmware image: bytes (the page), a byte array, or a URL the page can fetch (data: URLs too). */
+  async function imageBytes(image) {
+    if (image instanceof Uint8Array) return image;
+    if (image instanceof ArrayBuffer) return new Uint8Array(image);
+    if (ArrayBuffer.isView(image)) return new Uint8Array(image.buffer, image.byteOffset, image.byteLength);
+    if (Array.isArray(image)) {
+      if (image.some((b) => !Number.isInteger(b) || b < 0 || b > 255)) throw new ApiError('image array must hold bytes 0..255');
+      return Uint8Array.from(image);
+    }
+    if (typeof image === 'string' && image) {
+      try { return await fetchBytes(image); } catch (e) { throw new ApiError(`could not fetch the image ${image.startsWith('data:') ? '(data: URL)' : image}: ${errText(e)}`, 'pass a URL this page can fetch (served next to it, or a data:application/octet-stream;base64,… URL), or let a person choose the file in the Firmware panel'); }
+    }
+    throw new ApiError('image is required: a URL the page can fetch, or the image bytes', 'make the image with c6-image (wireless-can.bin); a person can choose it in the Firmware panel');
+  }
+
+  const fwInfoOut = (i) => ({ sha256: i.sha256, slot: i.slot, slotName: slotName(i.slot), pending: i.pending, maxLen: i.maxLen, updatable: i.maxLen > 0 && i.slot !== SLOT_UNKNOWN });
+
   async function probeVersion(d, base) {
     await forBase(base);
     const v = await dcall(`version(${baseHex(base)})`, T.version, () => d.deviceVersion(base), base);
@@ -235,6 +276,31 @@ export function createApi({ bridge, dingo, fetchText, log, opTimeouts = {}, now 
       throw new ApiError(`refusing to write: no dingoPDM answered a version request at base ${baseHex(base)} (${errText(e)})`,
         'run api.discover() to find the PDM base ids on the bus, then retry with a confirmed base');
     }
+  }
+
+  /**
+   * A WriteAll the PDM acknowledged with another count or CRC: what is it
+   * running now? dingoFW up to 0.5.11 applies the staged params live whenever
+   * the *count* matches, whatever the CRC, and its CAN receive mailbox could
+   * hand the protocol one frame twice and lose another (FetchRxFrame freed
+   * the slot before copying it; fixed in dingoFW 436e683, "fix mailbox
+   * race"). Seen on the bench PDM (0.5.3) over the bridge, 2026-10-19: 3 of
+   * 14 applies, count right, CRC wrong. So after such an ack the live config
+   * may be neither the old one nor the new one: read its CRC and say which.
+   */
+  async function afterWriteMismatch(d, b, enc, e) {
+    if (!/write (crc|count) mismatch/i.test(errText(e))) return e;
+    let live;
+    try { live = await dcall(`checkCrc(${baseHex(b)})`, T.checkCrc, () => d.checkCrc(b), b); } catch (e2) {
+      return new ApiError(`${errText(e)}; the live CRC could not be read afterwards (${errText(e2)})`, 'the PDM may be running a config that is neither the old nor the new one: api.verify(base, config) as soon as possible, and apply again');
+    }
+    const liveHex = crcHex(live.crc);
+    const matches = crcNum(live.crc) === crcNum(enc.crc);
+    L('warn', `apply(${baseHex(b)}): write mismatch; live CRC now ${liveHex} (${matches ? 'matches' : 'does NOT match'} the config's ${crcHex(enc.crc)})`);
+    return new ApiError(`${errText(e)}; live CRC afterwards ${liveHex}, ${matches ? 'which matches the config (the PDM holds it)' : `which is NOT the config's ${crcHex(enc.crc)}`}`,
+      matches
+        ? 'the PDM is running the intended config; apply again for a clean acknowledgement before burning (dingoFW <= 0.5.11 acknowledges a WriteAll whose frames its CAN mailbox mishandled with a wrong CRC)'
+        : "the PDM is running a config that is neither the old nor the new one (dingoFW <= 0.5.11 applies a WriteAll with the right count even when a frame was lost): apply again now, and do not burn until api.verify(base, config) matches");
   }
 
   // ---- board type
@@ -398,7 +464,7 @@ export function createApi({ bridge, dingo, fetchText, log, opTimeouts = {}, now 
       name: 'status', kind: 'info',
       summary: 'Connection state, device, WASM status, the op running now (with progress), last error, bridge filter and bridge counters.',
       args: [],
-      returns: '{ ok, connection: {state, deviceName, deviceId, bluetoothAvailable, lastError, reconnects, txQueued, counters}, filter: [{id,idHex,mask,maskHex}], stats: {tx_ok,tx_err,rx_forwarded,rx_dropped}|null, wasm: {loaded, error, info}, busy: {op, sinceMs, progress}|null, confirmedBases: [{base,baseHex,version}], lastError }',
+      returns: '{ ok, connection: {state, deviceName, deviceId, bluetoothAvailable, lastError, reconnects, txQueued, counters}, filter: [{id,idHex,mask,maskHex}], stats: {tx_ok,tx_err,rx_forwarded,rx_dropped}|null, wasm: {loaded, error, info}, busy: {op, sinceMs, progress}|null, confirmedBases: [{base,baseHex,version}], firmware: {state, lastInfo}|null, lastError }',
       example: 'await api.status()',
       run: async () => {
         const conn = bridge ? bridge.info() : { state: 'unavailable', bluetoothAvailable: false };
@@ -412,6 +478,7 @@ export function createApi({ bridge, dingo, fetchText, log, opTimeouts = {}, now 
           wasm: { loaded: !!dingoObj, error: dingoError, info: dingoObj?.info ?? null },
           busy: busy ? { op: busy.op, sinceMs: now() - busy.since, progress: busy.progress ?? null } : null,
           confirmedBases: [...confirmed].map(([b, v]) => ({ base: b, baseHex: baseHex(b), version: v })),
+          firmware: firmware ? { state: firmware.state, lastInfo: firmware.lastInfo() ? fwInfoOut(firmware.lastInfo()) : null } : null,
           lastError,
         };
       },
@@ -690,7 +757,12 @@ export function createApi({ bridge, dingo, fetchText, log, opTimeouts = {}, now 
         await forBase(b);
         readCache.delete(b);
         const o = { burn: !!opts.burn, partial: !!opts.partial, onProgress: (...a) => { if (busy) busy.progress = toPlain(a.length === 1 ? a[0] : a); } };
-        const r = await dcall(`apply(${baseHex(b)})`, T.apply, () => d.apply(b, txt, o), b);
+        let r;
+        try {
+          r = await dcall(`apply(${baseHex(b)})`, T.apply, () => d.apply(b, txt, o), b);
+        } catch (e) {
+          throw await afterWriteMismatch(d, b, enc, e);
+        }
         L('info', `applied ${r.applied} params to ${baseHex(b)} crc ${crcHex(r.crc)}${r.burned ? ' + burned' : ''}`);
         return { ok: true, base: b, baseHex: baseHex(b), applied: r.applied, crc: crcNum(r.crc), crcHex: crcHex(r.crc), burned: !!r.burned, partial: !!opts.partial, board: r.board ?? null, typeCheck, ...(r.warning ? { warning: r.warning } : {}) };
       },
@@ -806,6 +878,51 @@ export function createApi({ bridge, dingo, fetchText, log, opTimeouts = {}, now 
       },
     },
     {
+      name: 'firmwareInfo', kind: 'device',
+      summary: "The hilux C6's own firmware (its firmware service, FIRMWARE.md Info): the running image's digest (its identity: the last 32 bytes of its .bin), the app slot it runs from, whether it is an update still on trial (pending, for 20 s after its boot), and the room for an update (maxLen; 0: this C6 takes no updates). Needs the Firmware role (granted on the Kindle), not the CAN bridge role.",
+      args: [],
+      returns: '{ ok, sha256, slot, slotName, pending, maxLen, updatable, elapsedMs }',
+      example: 'await api.firmwareInfo()',
+      run: async () => {
+        await ensureFirmware();
+        try { return { ok: true, ...fwInfoOut(await firmware.info()) }; } catch (e) { throw fwError(e); }
+      },
+    },
+    {
+      name: 'firmwareCheck', kind: 'pure',
+      summary: "Dry run of a firmware update: checks the image (c6-ota's checkImage: the ESP-IDF app image of the ESP32-C6, whole 16-byte lines, its appended SHA-256) and, after firmwareInfo, that it fits and whether hilux already runs it. Sends nothing.",
+      args: [{ name: 'image', type: 'string (URL) | number[]', required: true, description: "the .bin c6-image made (wireless-can.bin): a URL the page can fetch (e.g. served next to the page, or a data:application/octet-stream;base64,… URL), or its bytes" }],
+      returns: '{ ok, len, sha256, maxLen|null, fits|null, running|null, sameAsRunning|null }',
+      example: "await api.firmwareCheck('./wireless-can.bin')",
+      run: async (image) => {
+        const bytes = await imageBytes(image);
+        const known = firmware?.lastInfo() ?? null;
+        const maxLen = known && known.maxLen > 0 ? known.maxLen : null;
+        let img;
+        try { img = await checkImage(bytes, null); } catch (e) { throw fwError(e); }
+        return { ok: true, len: img.len, sha256: img.sha256, maxLen, fits: maxLen === null ? null : img.len <= maxLen, running: known?.sha256 ?? null, sameAsRunning: known ? known.sha256 === img.sha256 : null };
+      },
+    },
+    {
+      name: 'firmwareUpdate', kind: 'device',
+      summary: "Update the hilux C6's firmware over Bluetooth (FIRMWARE.md): Info, the image check, the upload into the slot not running (windowed; resumes after a dropped link), the commit (the C6 checks the image in flash and resets into it), then waits until the new firmware runs and has confirmed itself (20 s after its boot; otherwise it rolls back by itself: code ROLLED_BACK). Takes 1-2 minutes plus ~30 s. Update when parked: CAN frames are dropped during the transfer. Only when the person asked for it. Errors carry `code` (BUSY, ON_TRIAL, UNAVAILABLE, NO_SPACE, HASH, IMAGE, NOT_AUTHORISED, SAME, …) and `hint`.",
+      args: [
+        { name: 'image', type: 'string (URL) | number[]', required: true, description: 'the .bin, as for firmwareCheck' },
+        { name: 'opts.allowSame', type: 'boolean', required: false, description: 'send an image hilux already runs (it then runs from the other slot); default false: refused with code SAME' },
+      ],
+      returns: '{ ok, len, sha256, previous: { sha256, slot }, slot, slotName, chunk, window, resumedFrom, resumes, rewinds, resends, written, uploadMs, kbps, committed, confirmMs, ms, elapsedMs }',
+      example: "await api.firmwareUpdate('./wireless-can.bin')",
+      run: async (image, opts = {}) => {
+        const bytes = await imageBytes(image);
+        await ensureFirmware();
+        let r;
+        try {
+          r = await firmware.update(bytes, { allowSame: !!opts.allowSame, onProgress: (p) => { if (busy) busy.progress = { ...p }; } });
+        } catch (e) { throw fwError(e); }
+        return { ok: true, ...r, slotName: slotName(r.slot) };
+      },
+    },
+    {
       name: 'skills', kind: 'info',
       summary: 'List the skills (markdown guides) this page serves. Read web-api and dingopdm-config before building a config.',
       args: [],
@@ -886,8 +1003,8 @@ export function createApi({ bridge, dingo, fetchText, log, opTimeouts = {}, now 
       notes: [
         'Every function is async: use `await api.fn(...)`. None throws; check `ok`. Errors carry `error` and often `hint`.',
         "Positional args are listed in order; names starting 'opts.' go in one trailing options object, e.g. api.apply(222, cfg, { burn: false }). You may also pass one object with the positional names: api.version({ base: 222 }).",
-        'Device ops (listen, discover, version, verify, readParams, apply, burn, setParam, getParam, sendFrame, filter) run one at a time; a second call while one runs returns { ok:false, error:"busy: <op> running" } — wait and retry. api.status().busy shows the running op and its progress.',
-        "Device ops auto-connect to the remembered hilux device. From script the Bluetooth chooser can never open; a person must click Connect once per browser profile (Connect uses the remembered device and opens the chooser only when there is none; the page's \"Choose device…\" button always opens it).",
+        'Device ops (listen, discover, version, verify, readParams, apply, burn, setParam, getParam, sendFrame, filter, firmwareInfo, firmwareUpdate) run one at a time; a second call while one runs returns { ok:false, error:"busy: <op> running" } — wait and retry. api.status().busy shows the running op and its progress.',
+        "Device ops auto-connect to the remembered hilux device. From script the Bluetooth chooser can never open; a person must click Connect once per browser profile (Connect uses the remembered device, and opens the chooser by itself when there is none or Chrome's grant lacks a service the page needs; the page has one connection control).",
         "verify(base, cfg) adds a warning when the config's baseId is not base (its matches then compares a config for another node). The page itself refuses Encode/Apply/Verify/Burn while its Base id field differs from the loaded config's baseId.",
         "Access is per device: the C6 serves the CAN bridge only to a computer paired with it that has the CAN bridge role, granted on the Kindle page (Settings → Bluetooth: Pair new device with CAN bridge, or tap an already paired device and turn CAN bridge on). Without it every op fails with \"This computer isn't allowed to use the CAN bridge — grant it the CAN bridge role on the Kindle\"; only a person at the Kindle can fix that, so do not retry.",
         "If connecting keeps failing with a hint about an old pairing, this computer holds a pairing the C6 has forgotten: the person must forget 'hilux' in macOS Bluetooth settings and PAIR again on the Kindle.",
@@ -895,6 +1012,7 @@ export function createApi({ bridge, dingo, fetchText, log, opTimeouts = {}, now 
         "apply refuses a config whose PdmDevices baseId differs from the target base (that would rewrite the device's base id) unless opts.allowBaseChange is true.",
         'apply also reads the board type the node broadcasts (high nibble of byte 1 of its status frame, base+2) and refuses a config whose pdmType differs, unless opts.allowTypeMismatch is true. The result says what it saw (typeCheck); a node that sent no status frame within 350 ms is not checked.',
         "The C6 body node (board c6body_v1) is configured exactly like a PDM: a PdmDevices entry with pdmType 12 (required: an output-less entry is never inferred), base 0x500 (1280) by default, blocks canInputs (8), canOutputs (8), virtualInputs (8), conditions (8), counters (4), flashers (4); no outputs, inputs, wipers, starter or keypads yet. Its var map differs from a PDM's (43 entries: AlwaysFalse 0, AlwaysTrue 1, State 2, CanIn<n>Out/Val 3-18, VirtIn1-8 19-26, Flasher1-4 27-30, Cond1-8 31-38, Counter1-4 39-42; var fields also accept these names as strings), and so do its parameter names: api.paramNames({ pdmType: 12 }). discover() lists it with board c6body_v1 (type 12), like any PDM. Examples: examples/c6-empty.json (every default; also what a never-configured node verifies as), examples/c6-test.json.",
+        "Firmware of the hilux C6 itself (not a PDM's): firmwareInfo → firmwareCheck(image) → firmwareUpdate(image), only when the person asks. It uses the C6's firmware service, which needs the Firmware role (granted on the Kindle like the CAN bridge role, Settings → Bluetooth; without it: \"This computer isn't allowed to update hilux's firmware…\", code NOT_AUTHORISED: do not retry). The update runs 1-2 minutes, CAN frames are dropped meanwhile (update when parked), then the C6 resets and the call waits until the update has confirmed itself (or reports ROLLED_BACK). An upload cut off by a dropped link resumes: call firmwareUpdate again with the same image within 60 s.",
         'CAN ids/base ids accept numbers or "0x.." strings. Results give both decimal and hex (idHex/baseHex/crcHex).',
         'apply without opts.partial resets every parameter not in the file to the firmware default — that is the intended, reproducible way to apply a full config.',
         'Large results are paged (readParams, encode params, skill, paramNames): follow nextOffset.',
@@ -944,6 +1062,7 @@ export function createApi({ bridge, dingo, fetchText, log, opTimeouts = {}, now 
         r = { ok: false, error: errText(e) };
         const h = e instanceof ApiError ? e.hint : undefined;
         if (h) r.hint = h; else { const h2 = hintFor(errText(e)); if (h2) r.hint = h2; }
+        if (e instanceof ApiError && e.code) r.code = e.code;
       } finally {
         if (locked) busy = null;
       }
@@ -956,6 +1075,9 @@ export function createApi({ bridge, dingo, fetchText, log, opTimeouts = {}, now 
   }
 
   function argPreview(a) {
+    if (a instanceof ArrayBuffer || ArrayBuffer.isView(a)) return `<${a.byteLength} bytes>`;
+    if (Array.isArray(a) && a.length > 64) return `<${a.length} bytes>`;
+    if (typeof a === 'string' && a.startsWith('data:')) return `"data: URL, ${a.length} chars"`;
     if (typeof a === 'string') return a.length > 40 ? JSON.stringify(a.slice(0, 37) + '...') : JSON.stringify(a);
     if (a && typeof a === 'object') { const s = JSON.stringify(a); return s && s.length > 60 ? s.slice(0, 57) + '...' : s; }
     return String(a);

@@ -7,6 +7,17 @@
 // wires these to the page.
 
 import { hex3 } from './ble.js';
+import { slotName } from './firmware.js';
+
+/** A firmware digest for a sentence: its first 12 hex digits (the full one is in the panel and the detail). */
+export const shortSha = (s) => (typeof s === 'string' && s ? s.slice(0, 12) : '?');
+/** Bytes for people: "1.32 MiB", "20 KiB", "300 B". */
+export function fmtBytes(n) {
+  if (!Number.isFinite(n)) return '?';
+  if (n >= 1048576) return `${(n / 1048576).toFixed(2)} MiB`;
+  if (n >= 1024) return `${Math.round(n / 1024)} KiB`;
+  return `${n} B`;
+}
 
 export const EXAMPLES = [
   { name: 'bench-toggle', path: './examples/bench-toggle.json' },
@@ -177,6 +188,7 @@ const OP_LABEL = {
   apply: 'Apply', verify: 'Check', burn: 'Burn', version: 'Version', discover: 'Find nodes', listen: 'Listen',
   connect: 'Connect', readParams: 'Read parameters', setParam: 'Set parameter', getParam: 'Read parameter',
   encode: 'Encode', sendFrame: 'Send frame', filter: 'Filter', disconnect: 'Disconnect', devices: 'Devices', paramNames: 'Parameter names',
+  firmwareInfo: 'Firmware info', firmwareCheck: 'Firmware check', firmwareUpdate: 'Firmware update', firmwareConnect: 'Firmware connect',
 };
 export const opLabel = (op) => OP_LABEL[op] ?? op;
 
@@ -203,10 +215,105 @@ const CONNECT_STEPS_STALE = [
  *   ctx  { op, node: "C6 body node · 0x500" | null, progress: { done, total } | null }
  * → { where: 'connection' | 'action', tone: 'danger' | 'warning', icon, headline, meaning, steps: [], actions: [{ action, label, primary? }], detail }
  */
+// The Firmware role (hilux FIRMWARE.md "Access"): granted like the CAN bridge's.
+const FIRMWARE_STEPS_ROLE = [
+  "On the Kindle: Settings › Bluetooth › this computer's name",
+  'Turn on Firmware, and tap again to confirm',
+  "If this computer isn't listed: Pair new device › Firmware, then click Read firmware info here while that window is open",
+];
+const FIRMWARE_STEPS_STALE = [
+  'On this Mac: System Settings › Bluetooth › hilux › Forget This Device',
+  'On the Kindle: Pair new device › Firmware',
+  'Then Read firmware info here, and accept the pairing prompt',
+];
+
+/**
+ * explainError for the firmware calls (firmwareInfo / firmwareCheck /
+ * firmwareUpdate / the panel's connect): by the result's `code` (firmware.js:
+ * the C6's error names, BUSY, ON_TRIAL, IMAGE…, and the link's), shown in the
+ * Firmware panel (where 'firmware'). x.code is the name, for the eyebrow.
+ */
+export function explainFirmwareError(r, ctx = {}) {
+  const err = String(r?.error ?? 'unknown error');
+  const code = r?.code ?? null;
+  const detail = err + (r?.hint ? `\nhint: ${r.hint}` : '');
+  const hint = r?.hint ? `${r.hint[0].toUpperCase()}${r.hint.slice(1)}.` : '';
+  const fromBox = /^(Info|Begin|Commit|Abort|data): [A-Z_]+: /.test(err);
+  const what = err.replace(/^(Info|Begin|Commit|Abort|data): [A-Z_]+: /, '');
+  const out = (o) => ({ where: 'firmware', tone: 'danger', icon: 'alert', steps: [], actions: [], detail, code, ...o });
+  const again = (label = 'Try again') => ({ action: 'fw-retry', label, primary: true });
+  switch (code) {
+    case 'NOT_AUTHORISED':
+      return out({ icon: 'lock', headline: "This computer isn't allowed to update hilux's firmware",
+        meaning: "It reached hilux, but hilux hasn't given it the Firmware role (the CAN bridge role doesn't include it). Only the Kindle can grant it; trying again from here won't help until then.",
+        steps: FIRMWARE_STEPS_ROLE, actions: [{ action: 'fw-info', label: 'Try again', primary: true }] });
+    case 'STALE_PAIRING_SUSPECTED':
+      return out({ icon: 'btOff', headline: "hilux seems to have refused this Mac's pairing",
+        meaning: "The link dropped while connecting. Chrome doesn't say why; the usual cause is that this Mac still holds a pairing hilux no longer has, and macOS won't pair again by itself.",
+        steps: FIRMWARE_STEPS_STALE, actions: [{ action: 'connect', label: 'Connect', primary: true }] });
+    case 'SERVICE_NOT_GRANTED':
+      return out({ icon: 'bt', headline: 'Chrome needs you to pick hilux again',
+        meaning: "Chrome hasn't let this page use hilux's firmware service (hilux was picked before the page asked for it). Connect opens Chrome's chooser: pick hilux there.",
+        actions: [{ action: 'connect', label: 'Connect', primary: true }] });
+    case 'NO_FIRMWARE_SERVICE':
+      return out({ headline: "hilux doesn't offer firmware updates",
+        meaning: 'It connected, but has no firmware service: its firmware predates updates over Bluetooth (it needs the probe once, the one-time move to the OTA partition table), or this Mac keeps hilux\'s services from before.',
+        steps: ["If hilux has the firmware service: forget 'hilux' in macOS System Settings → Bluetooth, then PAIR on the Kindle and connect again (the Mac then reads its services afresh)", "Otherwise: the wireless-can README, \"The one-time move to the OTA partition table\""],
+        actions: [{ action: 'fw-info', label: 'Try again' }] });
+    case 'NEEDS_USER_GESTURE':
+      return out({ tone: 'warning', icon: 'bt', headline: 'Connect once to pick hilux',
+        meaning: "This browser hasn't been given a hilux device yet. Chrome opens the Bluetooth chooser only from a click.",
+        actions: [{ action: 'connect', label: 'Connect', primary: true }] });
+    case 'NO_BLUETOOTH':
+      return out({ headline: "This browser can't use Bluetooth", meaning: 'Web Bluetooth needs desktop Chrome or Edge, on a secure origin such as localhost.', steps: ['Open http://localhost:5173 in desktop Chrome'] });
+    case 'UNAVAILABLE':
+      return out({ tone: 'warning', icon: 'info', headline: "This hilux doesn't take updates yet",
+        meaning: `${what[0].toUpperCase()}${what.slice(1)}. Nothing was written.`,
+        steps: ["The one-time move needs the probe: the wireless-can README, \"The one-time move to the OTA partition table\""] });
+    case 'BUSY':
+      return out({ tone: 'warning', icon: 'info', headline: 'Another update is running on hilux',
+        meaning: "Another connection's upload is in progress. hilux drops it 60 s after its last bytes; then update again. Nothing was written.", actions: [again()] });
+    case 'ON_TRIAL':
+      return out({ tone: 'warning', icon: 'info', headline: 'hilux is still trying out its last update',
+        meaning: 'The firmware it runs is an update not yet confirmed (it confirms itself 20 s after its boot). Until then a new upload is refused, so the slot it would roll back to stays intact. Nothing was written.',
+        actions: [again('Try again'), { action: 'fw-info', label: 'Read firmware info' }] });
+    case 'SAME':
+      return out({ tone: 'warning', icon: 'info', headline: 'hilux already runs this image', meaning: 'The file is the firmware hilux runs now (same digest). Nothing was sent.', actions: [{ action: 'fw-file', label: 'Choose another file…', primary: true }] });
+    case 'IMAGE':
+      return fromBox
+        ? out({ headline: 'hilux refused the image', meaning: `It received every byte, checked the image in flash and refused it: ${what}. Nothing changed; it keeps running its firmware.`, steps: r?.hint ? [hint] : [] })
+        : out({ tone: 'warning', icon: 'file', headline: "This file isn't a hilux firmware image", meaning: `${err[0].toUpperCase()}${err.slice(1)}. Nothing was sent.`, steps: r?.hint ? [hint] : [], actions: [{ action: 'fw-file', label: 'Choose another file…', primary: true }] });
+    case 'NO_SPACE':
+      return out({ tone: 'warning', icon: 'file', headline: "The image doesn't fit hilux's app slot", meaning: `${what[0].toUpperCase()}${what.slice(1)}. Nothing was written.`, actions: [{ action: 'fw-file', label: 'Choose another file…', primary: true }] });
+    case 'HASH':
+      return out({ headline: 'The image arrived damaged', meaning: "hilux's SHA-256 of the bytes it received isn't the image's digest. Nothing changed; update again.", actions: [again('Update again')] });
+    case 'FLASH':
+      return out({ headline: "hilux couldn't write its flash", meaning: `${what[0].toUpperCase()}${what.slice(1)}. Nothing changed; it keeps running its firmware.`, actions: [again('Update again')] });
+    case 'SWITCH':
+      return out({ headline: "hilux couldn't switch to the update", meaning: 'The image checked out, but hilux could not record the update or select its slot. Nothing changed and it did not reset.', actions: [again('Update again')] });
+    case 'DROPPED': case 'STALLED': case 'TIMEOUT': case 'NOT_CONNECTED':
+      return out({ icon: 'btOff', headline: code === 'STALLED' ? 'hilux stopped acknowledging the upload' : code === 'TIMEOUT' && !fromBox ? "hilux didn't answer" : fromBox ? 'hilux dropped the upload' : 'Lost the link during the update',
+        meaning: fromBox ? `${what[0].toUpperCase()}${what.slice(1)}. Update again: it begins afresh.` : 'hilux keeps what it received for 60 s after the last bytes: update again with the same file and it resumes from there. It keeps running its firmware until an update is complete and checked.',
+        actions: [again('Resume the update')] });
+    case 'NO_RESET': case 'NOT_BACK': case 'NOT_CONFIRMED':
+      return out({ tone: 'warning', icon: 'info', headline: code === 'NOT_BACK' ? "hilux hasn't come back after its reset" : code === 'NO_RESET' ? "hilux didn't reset" : "The update isn't confirmed yet",
+        meaning: `${err[0].toUpperCase()}${err.slice(1)}. An update confirms itself 20 s after it boots, or rolls back to the firmware it came from after three boots.`, actions: [{ action: 'fw-info', label: 'Read firmware info', primary: true }] });
+    case 'ROLLED_BACK':
+      return out({ headline: 'The update was rolled back',
+        meaning: `${err[0].toUpperCase()}${err.slice(1)}. hilux runs the firmware it had before; nothing else changed.`, steps: r?.hint ? [hint] : [] });
+    default: {
+      const x = explainError(r, { ...ctx, op: 'firmware-generic' });
+      return { ...x, where: 'firmware', code, headline: x.headline === 'firmware-generic failed' ? `${opLabel(ctx.op) || 'Firmware'} failed` : x.headline,
+        actions: x.actions.map((a) => ({ ...a, action: a.action === 'retry' ? 'fw-retry' : a.action })) };
+    }
+  }
+}
+
 export function explainError(r, ctx = {}) {
+  const op = ctx.op || '';
+  if (op.startsWith('firmware') && op !== 'firmware-generic') return explainFirmwareError(r, ctx);
   const err = String(r?.error ?? 'unknown error');
   const m = err.toLowerCase();
-  const op = ctx.op || '';
   const node = ctx.node || 'The node';
   const detail = err + (r?.hint ? `\nhint: ${r.hint}` : '');
   const out = (o) => ({ where: 'action', tone: 'danger', icon: 'alert', steps: [], actions: [], detail, ...o });
@@ -217,17 +324,17 @@ export function explainError(r, ctx = {}) {
   if (m.includes("isn't allowed to use the can bridge")) {
     return conn({ icon: 'lock', headline: "This computer isn't allowed to use the CAN bridge",
       meaning: "It reached hilux, but hilux hasn't given it the CAN bridge role, so it can't talk to the nodes. Only the Kindle can grant it; trying again from here won't help until then.",
-      steps: CONNECT_STEPS_ROLE, actions: [{ action: 'connect', label: 'Try again', primary: true }] });
+      steps: CONNECT_STEPS_ROLE, actions: [{ action: 'connect', label: 'Connect', primary: true }] });
   }
   if (m.includes('old pairing') || m.includes('link dropped while connecting')) {
     return conn({ headline: "hilux seems to have refused this Mac's pairing",
       meaning: "The link dropped while connecting. Chrome doesn't say why; the usual cause is that this Mac still holds a pairing hilux no longer has (for example after Forget on the Kindle), and macOS won't pair again by itself.",
-      steps: CONNECT_STEPS_STALE, actions: [{ action: 'connect', label: 'Connect again', primary: true }] });
+      steps: CONNECT_STEPS_STALE, actions: [{ action: 'connect', label: 'Connect', primary: true }] });
   }
   if (m.includes('not granted this page')) {
     return conn({ headline: 'Chrome needs you to pick hilux again',
-      meaning: "Chrome hasn't let this page use hilux's CAN bridge service (hilux was picked before that service existed). Picking it again in the Bluetooth chooser grants it.",
-      actions: [{ action: 'choose', label: 'Choose device…', primary: true }] });
+      meaning: "Chrome hasn't let this page use hilux's CAN bridge service (hilux was picked before that service existed). Connect opens Chrome's chooser: pick hilux there.",
+      actions: [{ action: 'connect', label: 'Connect', primary: true }] });
   }
   if (m.includes('user cancelled') || m.includes('user canceled')) {
     return conn({ tone: 'warning', icon: 'bt', headline: 'No device was picked',
@@ -247,23 +354,23 @@ export function explainError(r, ctx = {}) {
   if (m.includes('waiting for an advertisement')) {
     return conn({ tone: 'warning', icon: 'bt', headline: "Can't find hilux",
       meaning: "It isn't advertising nearby. Check the controller has power and this computer is within a few metres, then try again. The page listens for it for 12 s after each try.",
-      actions: [{ action: 'connect', label: 'Look again', primary: true }, { action: 'choose', label: 'Choose a different device…' }] });
+      actions: [{ action: 'connect', label: 'Connect', primary: true }] });
   }
   if (m.includes('can bridge service') && m.includes('was not found')) {
     return conn({ headline: "hilux isn't offering the CAN bridge",
       meaning: 'It connected, but the bridge service is missing: the C6 may be running firmware without the bridge.',
-      actions: [{ action: 'connect', label: 'Try again', primary: true }] });
+      actions: [{ action: 'connect', label: 'Connect', primary: true }] });
   }
   if (m.includes('wasm not available')) {
     return conn({ icon: 'alert', headline: "The page's dingo module didn't load",
       meaning: 'Every node operation runs in dingo.wasm, so none of them can work until it loads.',
       steps: ['In the dingo-web container: web/build.sh', 'Reload this page'] });
   }
-  if (m.includes('auto-reconnect gave up') || m.includes('link dropped') || /(^|\W)not connected/.test(m) || m.includes('cannot send') || m === 'disconnected' || m.includes('gatt.connect()') || m.includes('connection attempt failed')) {
+  if (m.includes('reconnect gave up') || m.includes('link dropped') || /(^|\W)not connected/.test(m) || m.includes('cannot send') || m === 'disconnected' || m.includes('gatt.connect()') || m.includes('connection attempt failed')) {
     const lost = m.includes('auto-reconnect') || m.includes('link dropped') || m.includes('cannot send');
     return conn({ headline: lost ? 'Lost the connection to hilux' : "Couldn't connect to hilux",
       meaning: lost ? "The Bluetooth link dropped and the page couldn't get it back." : 'hilux did not complete the connection. Check it has power and is in range.',
-      actions: [{ action: 'connect', label: 'Connect again', primary: true }] });
+      actions: [{ action: 'connect', label: 'Connect', primary: true }] });
   }
 
   // Stopped on purpose by the api: nothing was sent.
@@ -419,6 +526,15 @@ export function activityEvent(name, args, r, ctx = {}) {
       return { ...ev, tone: 'info', icon: 'wave', title: `Sent frame ${r.idHex} ${r.dataHex.replace(/(..)(?=.)/g, '$1 ')}`, sub: '' };
     case 'filter':
       return { ...ev, tone: 'info', icon: 'info', title: `Bridge filter: ${r.text}`, sub: '' };
+    case 'firmwareInfo':
+      return { ...ev, tone: 'info', icon: 'info', title: `hilux runs firmware ${shortSha(r.sha256)} from ${r.slotName}`,
+        sub: [r.pending ? 'an update on trial, not yet confirmed' : 'confirmed', r.updatable ? `room for ${fmtBytes(r.maxLen)}` : 'takes no updates'].join(' · ') };
+    case 'firmwareCheck':
+      return { ...ev, tone: 'info', icon: 'file', title: `Checked a firmware image: ${shortSha(r.sha256)}, ${fmtBytes(r.len)}`,
+        sub: [r.fits === false ? `too big (room for ${fmtBytes(r.maxLen)})` : '', r.sameAsRunning ? 'hilux already runs it' : '', 'nothing sent'].filter(Boolean).join(' · ') };
+    case 'firmwareUpdate':
+      return { ...ev, icon: 'check', title: `Updated hilux's firmware to ${shortSha(r.sha256)}`,
+        sub: [`${slotName(r.previous?.slot)} → ${r.slotName}`, `${fmtBytes(r.len)} at ${r.kbps} kB/s`, r.resumes ? `${r.resumes} resume${r.resumes === 1 ? '' : 's'}` : '', `confirmed ${fmtDuration(r.confirmMs)} after the reset`].filter(Boolean).join(' · ') };
     default:
       return { ...ev, tone: 'info', icon: 'info', title: `${opLabel(name)} done`, sub: '' };
   }
@@ -554,4 +670,96 @@ export function guardView(g, info, nodes = new Map(), selected = null, cfgName =
   const sel = nodes.get(selected);
   const selText = `the ${nodeAt(sel, selected)}`;
   return { headline: 'This config is for a different node', meaning: `${name} is for ${target || 'another node'}, but the selected node is ${selText}. Nothing is sent until they agree.`, fixes };
+}
+
+// ------------------------------------------------------------- firmware ----
+
+/** What each firmware update phase (firmware.js / ota-client.js onProgress) is, for a person. */
+export const FIRMWARE_PHASES = {
+  begin: 'Starting the upload',
+  upload: 'Sending the image',
+  reconnect: 'The link dropped: reconnecting to resume',
+  rebooting: 'Committed: hilux checked the image and is resetting',
+  booting: 'Waiting for hilux to come back',
+  trial: 'Running the update on trial (it confirms itself 20 s after its boot)',
+};
+
+/**
+ * The firmware update's progress line → { label, pct, sentText, rateText, etaText }.
+ * p: the last onProgress ({ phase, sent, total, kbps }); sent survives
+ * the phases that report 0 (begin/reconnect after a drop) as `lastSent`.
+ */
+export function firmwareProgress(p, lastSent = 0) {
+  if (!p) return { label: 'Starting', pct: 0, sentText: '', rateText: '', etaText: '' };
+  const total = p.total || 0;
+  const sent = p.phase === 'upload' ? p.sent : Math.max(p.sent || 0, ['rebooting', 'booting', 'trial'].includes(p.phase) ? total : lastSent);
+  const pct = total ? Math.min(100, Math.round((sent * 100) / total)) : 0;
+  const kbps = Number.isFinite(p.kbps) && p.kbps > 0 ? p.kbps : null;
+  const eta = p.phase === 'upload' && kbps && sent < total ? `about ${Math.max(1, Math.round((total - sent) / kbps / 1000))} s left` : '';
+  return { label: FIRMWARE_PHASES[p.phase] ?? p.phase, pct, sentText: total ? `${fmtBytes(sent)} of ${fmtBytes(total)}` : '', rateText: kbps ? `${kbps} kB/s` : '', etaText: eta };
+}
+
+/**
+ * The Firmware panel's body (all but a problem block, which app.js draws with
+ * its problemHtml). fw: { info, infoAt, reading, file: { name, size, check }
+ * | null, confirming, running, progress, lastSent, started, result }.
+ */
+export function firmwareHtml(fw, now = Date.now()) {
+  const stat = (k, v, cls = '', title = '') => `<div class="stat"${title ? ` title="${esc(title)}"` : ''}><span class="eb">${k}</span><div class="v ${cls}">${esc(v)}</div></div>`;
+  const i = fw.info;
+  const infoHtml = i
+    ? `<div class="stats fwstats">${stat('Running', shortSha(i.sha256), 'mono', `sha256 ${i.sha256}`)}${stat('Slot', i.slotName, 'mono')}${stat('State', i.pending ? 'On trial' : 'Confirmed', 'txt')}${stat('Room', i.updatable ? fmtBytes(i.maxLen) : 'no updates', i.updatable ? 'mono' : 'txt', i.updatable ? `${i.maxLen} bytes` : '')}</div>
+       <p class="hint" style="margin:0">Read ${fmtAgo(now - (fw.infoAt ?? now))}. The digest is the image's last 32 bytes, its identity (the C6 logs it at boot).${i.pending ? ' On trial: an update not yet confirmed; it confirms itself 20 s after its boot, and a new update waits until then.' : ''}</p>`
+    : `<p class="hint" style="margin:0">${fw.reading ? 'Reading…' : "Not read yet. Read firmware info connects to hilux's firmware service (it needs the Firmware role, granted on the Kindle)."}</p>`;
+  let fileHtml;
+  const f = fw.file;
+  if (!f) {
+    fileHtml = `<div class="file fwdrop">${icon('file')}<div style="display:flex;flex-direction:column;gap:2px;min-width:0"><span class="nm">No image chosen</span><span class="sub">Drop wireless-can.bin here, or choose it. It is checked before anything is sent.</span></div></div>`;
+  } else {
+    const c = f.check;
+    const sub = !c ? 'Checking…'
+      : !c.ok ? `Not usable: ${c.error}`
+        : [`${fmtBytes(c.len)}`, `sha256 ${shortSha(c.sha256)}`, c.fits === false ? `too big: room for ${fmtBytes(c.maxLen)}` : '', c.sameAsRunning ? 'hilux already runs it' : c.running ? 'differs from what hilux runs' : ''].filter(Boolean).join(' · ');
+    fileHtml = `<div class="file fwdrop">${icon('file')}<div style="display:flex;flex-direction:column;gap:2px;min-width:0"><span class="nm">${esc(f.name)}</span><span class="sub${c && !c.ok ? ' c-danger' : ''}"${c?.ok ? ` title="sha256 ${esc(c.sha256)}"` : ''}>${esc(sub)}</span></div></div>`;
+  }
+  const canUpdate = !!(f?.check?.ok && f.check.fits !== false && !fw.running);
+  const buttons = `<div class="actions">
+      <button type="button" class="btn" data-act="fw-file"${fw.running ? ' disabled' : ''}>${icon('file')}Choose image…</button>
+      <button type="button" class="btn pri" data-act="fw-confirm"${canUpdate && !fw.confirming ? '' : ' disabled'}>${icon('apply')}Update firmware…</button>
+      <span class="hint">Update when parked: CAN frames are dropped during the 1–2 minute transfer (the PDMs keep running), then hilux resets.</span>
+    </div>`;
+  let confirmHtml = '';
+  if (fw.confirming && f?.check?.ok) {
+    confirmHtml = `<section class="prob confirm" role="alertdialog" aria-label="Confirm firmware update">${icon('alert')}<div class="body">
+      <span class="eb c-danger">Firmware update · asks first</span>
+      <h2 class="title">Update hilux to ${esc(shortSha(f.check.sha256))}?</h2>
+      <p>${esc(f.name)} (${esc(fmtBytes(f.check.len))}) goes into the app slot hilux is not running${i ? ` (it runs ${esc(i.slotName)})` : ''}, is checked there, and boots next. While it uploads, CAN frames are dropped, so do this parked. hilux then resets (WiFi, Bluetooth and CAN go for a few seconds) and runs the update on trial: if it doesn't confirm itself within 20 s of booting, three times, hilux goes back to the firmware it runs now.</p>
+      <div class="btns"><button type="button" class="btn danger solid" data-act="fw-go">Update firmware</button><button type="button" class="btn" data-act="fw-cancel">Cancel</button></div>
+    </div></section>`;
+  }
+  let progressHtml = '';
+  if (fw.running || fw.result) {
+    const pr = firmwareProgress(fw.progress, fw.lastSent);
+    const done = fw.result?.ok;
+    const pct = done ? 100 : pr.pct;
+    const indet = !done && ['begin', 'reconnect', 'booting', 'trial', 'rebooting'].includes(fw.progress?.phase ?? 'begin');
+    const meta = [pr.sentText, pr.rateText, pr.etaText, fw.started ? fmtDuration(now - fw.started) : ''].filter(Boolean).join(' · ');
+    progressHtml = `<div>
+        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap">
+          <span style="font-weight:600">${esc(done ? 'Updated and confirmed' : fw.running ? pr.label : 'Stopped')}</span>
+          <span class="mono hint">${esc(done ? `${fmtBytes(fw.result.len)} at ${fw.result.kbps} kB/s` : meta)}</span>
+        </div>
+        <div class="bar${indet && fw.running ? ' indet' : ''}" role="progressbar" aria-label="Firmware sent" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}" style="margin-top:12px"><div style="${indet && fw.running ? '' : `width:${pct}%`}"></div></div>
+      </div>`;
+    if (done) {
+      const r = fw.result;
+      progressHtml += `<div class="result"><span class="st">${icon('check', 'ico sm')}</span><div style="display:flex;flex-direction:column;gap:6px;flex:1">
+        <span class="eb c-info">Finished in ${esc(fmtDuration(r.ms))}</span>
+        <span class="title">hilux runs ${esc(shortSha(r.sha256))}</span>
+        <span>${esc(`From ${slotName(r.previous?.slot)} to ${r.slotName}; uploaded in ${fmtDuration(r.uploadMs)}${r.resumes ? `, resumed ${r.resumes} time${r.resumes === 1 ? '' : 's'} after a dropped link` : ''}; it confirmed itself ${fmtDuration(r.confirmMs)} after the reset.`)}</span>
+        <div class="btns" style="display:flex;gap:10px;margin-top:6px"><button type="button" class="btn" data-act="fw-done">Done</button></div>
+      </div></div>`;
+    }
+  }
+  return `${infoHtml}${fileHtml}${buttons}${confirmHtml}${progressHtml}`;
 }

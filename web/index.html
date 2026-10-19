@@ -46,6 +46,7 @@
   .btn:disabled { opacity: .45; cursor: default; }
   .linkbtn { border: 0; background: none; padding: 4px 2px; font: 500 15px var(--f-body); color: var(--muted); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
   .linkbtn:hover { color: var(--ink); } .linkbtn:disabled { opacity: .45; cursor: default; }
+  .linkbtn.small { font-size: 13px; }
   select, input[type=text], input:not([type]), input[type=number] { font: 500 15px var(--f-body); min-height: 40px; border-radius: 10px; border: 1px solid var(--control); padding: 0 10px; background: var(--surface); color: var(--ink); }
   :focus-visible { outline: 2px solid var(--info); outline-offset: 2px; }
 
@@ -205,6 +206,11 @@
   .result .st { background: var(--info); color: #FFFFFF; }
   .result .title { font: 700 22px var(--f-head); }
 
+  /* firmware panel */
+  .fwstats { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  @media (max-width: 700px) { .fwstats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  #fwPanel.drag { outline: 3px dashed var(--accent); outline-offset: 2px; }
+
   /* last activity strip, activity view */
   .strip { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 12px 16px; text-decoration: none; color: var(--ink); }
   .strip:hover { border-color: var(--control); color: var(--ink); }
@@ -244,11 +250,15 @@
 <header class="top">
   <span class="brand">dingo-web</span>
   <span class="tagline">Configure dingo nodes over the hilux CAN bridge</span>
-  <div class="top-right">
+  <!-- The page's one connection control (link.js): its status and one button
+       (Connect / Connecting… / Disconnect). Connect uses the hilux Chrome
+       remembers and opens Chrome's chooser by itself when there is none or its
+       grant lacks a service this page needs. Panels and problem cards only
+       point at it (their "connect" next step runs this control). -->
+  <div id="connCtl" class="top-right conn-ctl" role="group" aria-label="Connection to hilux">
     <span id="connPill" class="pill" role="status">Loading…</span>
-    <button id="btnConnect" class="btn pri" type="button" title="connect to the remembered hilux bridge; opens the Bluetooth chooser only if there is none">Connect</button>
-    <button id="btnDisconnect" class="btn quiet" type="button">Disconnect</button>
-    <button id="btnChoose" class="linkbtn" type="button" title="always open the Bluetooth chooser (pick hilux again, e.g. to grant the CAN bridge service)">Choose device…</button>
+    <button id="btnConn" class="btn pri" type="button">Connect</button>
+    <button id="btnSwitch" class="linkbtn small" type="button" title="pick a different hilux in Chrome's Bluetooth chooser">Use another hilux…</button>
   </div>
 </header>
 <div id="banner" class="banner" aria-live="polite"></div>
@@ -332,6 +342,16 @@
     <div id="burnConfirm"></div>
     <div id="actionProblem"></div>
     <section id="applyPanel" class="card applyp" aria-label="Apply" hidden></section>
+
+    <section id="fwPanel" class="card cfg fw" aria-label="hilux firmware">
+      <div class="cfg-head">
+        <h2>hilux firmware</h2>
+        <button id="btnFwInfo" class="btn" type="button" data-act="fw-info" title="read what hilux runs, over the page's link to it (needs the Firmware role, granted on the Kindle)">Read firmware info</button>
+      </div>
+      <div id="fwBody" style="display:flex;flex-direction:column;gap:14px"></div>
+      <div id="fwProblem"></div>
+      <input type="file" id="fwFile" accept=".bin,application/octet-stream" hidden>
+    </section>
 
     <a id="lastActivity" class="card strip" href="#activity"></a>
   </main>
